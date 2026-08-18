@@ -1,0 +1,1 @@
+"""Ege Assistant düşünme katmanı."""

@@ -1,0 +1,18 @@
+# API anahtarları ve gizli bilgiler
+.env
+
+# Python sanal ortamı
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test cache
+.pytest_cache/
+
+# IDE
+.vscode/settings.json
