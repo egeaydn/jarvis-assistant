@@ -40,6 +40,8 @@ SYSTEM_PROMPT = (
     "- Tool gerekmiyorsa direkt yanıtla.\n"
     "- Gereksiz uzun açıklamalar yapma.\n"
     "- Dosya silme veya taşıma işlemlerinde kullanıcıyı bilgilendir.\n"
+    "- Kullanıcı 'ekrana bak', 'ne goruyorsun', 'hata ne' gibi sorular sorarsa\n"
+    "  analyze_screen tool'unu kullan.\n"
 )
 
 # ── Groq / OpenAI formatı tool tanımları ─────────────────────────────────────
@@ -49,7 +51,7 @@ GROQ_TOOLS: List[dict] = [
         "description": "Bir Windows masaüstü uygulamasını açar.",
         "parameters": {"type": "object",
             "properties": {"app_name": {"type": "string",
-                "description": "Açılacak uygulama adı: chrome, edge, discord, spotify, notepad, notepad++, vscode, steam, explorer, calculator, paint, wordpad"}},
+                "description": "Açılacak uygulama adı: chrome, edge, firefox, discord, spotify, steam, epic, xbox, notion, zoom, whatsapp, word, excel, powerpoint, outlook, vscode, visualstudio, cursor, androidstudio, notepad, notepad++, ssms, dbeaver, postman, github, xampp, explorer, calculator, paint, lghub, geforce, settings"}},
             "required": ["app_name"]}}},
     {"type": "function", "function": {
         "name": "close_application",
@@ -140,6 +142,19 @@ GROQ_TOOLS: List[dict] = [
         "parameters": {"type": "object",
             "properties": {"filepath": {"type": "string", "description": "Silinecek dosyanın tam yolu"}},
             "required": ["filepath"]}}},
+    # ── Phase 7 — Screen Vision ───────────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "analyze_screen",
+        "description": "Ekranın anlık görüntüsünü alır ve Gemini Vision ile analiz eder. 'Ekrana bak', 'ne görüyorsun', 'bu hata ne', 'hangi uygulama açık' gibi sorularda kullan.",
+        "parameters": {"type": "object",
+            "properties": {"prompt": {"type": "string", "description": "Analize yönlendirici soru (isteğe bağlı): 'hata mesajı var mı?', 'ne görüyorsun?', 'hangi uygulama açık?'"}},
+            "required": []}}},
+    {"type": "function", "function": {
+        "name": "capture_screenshot",
+        "description": "Ekranın anlık görüntüsünü PNG dosyası olarak kaydeder.",
+        "parameters": {"type": "object",
+            "properties": {"save_path": {"type": "string", "description": "Kayıt yolu (boş bırakılırsa Masaüstü'ne zaman damgalı kaydeder)"}},
+            "required": []}}},
 ]
 
 
@@ -224,6 +239,17 @@ def _build_gemini_tools():
             parameters=gt.Schema(type=gt.Type.OBJECT, properties={
                 "filepath": gt.Schema(type=gt.Type.STRING, description="Silinecek dosyanın tam yolu")},
                 required=["filepath"])),
+        # ── Phase 7 ─────────────────────────────────────────────────────────
+        gt.FunctionDeclaration(name="analyze_screen",
+            description="Ekranın anlık görüntüsünü alır ve Gemini Vision ile analiz eder. Ekrana bak, hata ne, ne görüyorsun gibi sorularda kullan.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "prompt": gt.Schema(type=gt.Type.STRING, description="Analize yönlendirici soru (isteğe bağlı)")},
+                required=[])),
+        gt.FunctionDeclaration(name="capture_screenshot",
+            description="Ekranın anlık görüntüsünü PNG dosyası olarak kaydeder.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "save_path": gt.Schema(type=gt.Type.STRING, description="Kayıt yolu (boş birakilirsa Masaüstü'ne kaydeder)")},
+                required=[])),
     ]
     return [gt.Tool(function_declarations=decls)]
 
@@ -335,7 +361,7 @@ class LLMManager:
             raise EnvironmentError("GEMINI_API_KEY .env dosyasında bulunamadı.")
         client = genai.Client(api_key=api_key)
         self._gemini_chat = client.chats.create(
-            model="gemini-2.0-flash",
+            model="gemini-3.6-flash",
             config=gt.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 tools=_build_gemini_tools(),

@@ -17,8 +17,12 @@ from app.tools.file_manager_tools import (
     move_file,
 )
 from app.tools.file_tools import find_file, open_file
+from app.tools.screen_tools import analyze_screen, capture_screenshot
 from app.tools.system_tools import get_system_info
 from app.tools.tool_manager import ToolManager
+from app.services.stt import SpeechToText
+from app.services.tts import TextToSpeech
+from app.ui.window import start_ui
 
 
 def build_tool_manager() -> ToolManager:
@@ -44,13 +48,17 @@ def build_tool_manager() -> ToolManager:
     tm.register("copy_file",                "Dosya kopyalar",                             copy_file,                {"src": "str", "dst": "str"})
     tm.register("delete_file",              "Dosya siler (guvenlik onayi gerektirir)",   delete_file,              {"filepath": "str"})
 
+    # ── Phase 7 — Screen Vision ───────────────────────────────────────────
+    tm.register("analyze_screen",           "Ekrani Gemini Vision ile analiz eder",      analyze_screen,           {"prompt": "str (opsiyonel)"})
+    tm.register("capture_screenshot",       "Ekran goruntusunu PNG olarak kaydeder",     capture_screenshot,       {"save_path": "str (opsiyonel)"})
+
     return tm
 
 
 def _print_header(provider: str, voice_mode: bool) -> None:
-    mode_str = "AI Agent + Sesli Mod" if voice_mode else "AI Agent"
+    mode_str = "AI Agent + Sesli Mod" if voice_mode else "AI Agent + Vision"
     print("=" * 52)
-    print(f"  Ege Assistant v0.6 — {mode_str}")
+    print(f"  Ege Assistant v0.7 — {mode_str}")
     print(f"  Saglaiyci: {provider.upper()}")
     print("=" * 52)
 
@@ -183,9 +191,17 @@ def _show_history(agent: Agent) -> None:
 # ── Giriş noktası ─────────────────────────────────────────────────────────────
 
 def main() -> None:
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stderr.reconfigure(encoding='utf-8')
+        except AttributeError:
+            pass
+
     voice_mode = "--voice" in sys.argv
 
     tm = build_tool_manager()
+
 
     try:
         llm = LLMManager(
@@ -202,10 +218,15 @@ def main() -> None:
         memory=memory,
     )
 
-    if voice_mode:
+    if "--voice" in sys.argv:
         run_voice_mode(agent, llm.provider_name)
-    else:
+    elif "--text" in sys.argv:
         run_text_mode(agent, llm.provider_name)
+    else:
+        # Varsayılan olarak modern masaüstü arayüzünü (GUI) başlat
+        stt = SpeechToText()
+        tts = TextToSpeech()
+        start_ui(agent, stt, tts)
 
 
 if __name__ == "__main__":
