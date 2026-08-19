@@ -23,6 +23,7 @@ from app.tools.tool_manager import ToolManager
 from app.services.stt import SpeechToText
 from app.services.tts import TextToSpeech
 from app.ui.window import start_ui
+from app.tools.autonomous_tools import run_terminal_command, organize_folder
 
 
 def build_tool_manager() -> ToolManager:
@@ -52,13 +53,17 @@ def build_tool_manager() -> ToolManager:
     tm.register("analyze_screen",           "Ekrani Gemini Vision ile analiz eder",      analyze_screen,           {"prompt": "str (opsiyonel)"})
     tm.register("capture_screenshot",       "Ekran goruntusunu PNG olarak kaydeder",     capture_screenshot,       {"save_path": "str (opsiyonel)"})
 
+    # ── Phase 9 — Autonomous Assistant ────────────────────────────────────────
+    tm.register("run_terminal_command",     "Dizinde terminal komutu calistirir",        run_terminal_command,     {"command": "str", "cwd": "str (opsiyonel)"})
+    tm.register("organize_folder",          "Klasordeki dosyalari otomatik duzenler",    organize_folder,          {"folder_path": "str", "rule": "str (opsiyonel)"})
+
     return tm
 
 
 def _print_header(provider: str, voice_mode: bool) -> None:
-    mode_str = "AI Agent + Sesli Mod" if voice_mode else "AI Agent + Vision"
+    mode_str = "AI Agent + Sesli Mod" if voice_mode else "Autonomous Assistant"
     print("=" * 52)
-    print(f"  Ege Assistant v0.7 — {mode_str}")
+    print(f"  Ege Assistant v0.9 — {mode_str}")
     print(f"  Saglaiyci: {provider.upper()}")
     print("=" * 52)
 

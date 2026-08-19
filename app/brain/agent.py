@@ -23,7 +23,12 @@ MAX_STEPS = 8          # Sonsuz döngü güvencesi
 FINISH_TOKEN = "FINISH"  # LLM bu action'ı döndürdüğünde döngü biter
 
 # Onay gerektiren riskli tool'lar (Security System)
-CONFIRMATION_REQUIRED: set = {"delete_file", "move_file"}
+CONFIRMATION_REQUIRED: set = {
+    "delete_file",
+    "move_file",
+    "run_terminal_command",
+    "organize_folder",
+}
 
 
 # ── Veri yapısı ───────────────────────────────────────────────────────────────
@@ -171,6 +176,14 @@ def _describe_action(tool_name: str, args: dict) -> str:
         src = args.get("src", "?")
         dst = args.get("dst", "?")
         return f"'{src}' → '{dst}' olarak TAŞINACAK"
+    if tool_name == "run_terminal_command":
+        cmd = args.get("command", "?")
+        cwd = args.get("cwd", "Mevcut dizin")
+        return f"Dizin: {cwd} üzerinde şu terminal komutu ÇALIŞTIRILACAK:\n> {cmd}"
+    if tool_name == "organize_folder":
+        path = args.get("folder_path", "?")
+        rule = args.get("rule", "tür")
+        return f"'{path}' klasörü '{rule}' kuralına göre DÜZENLENECEK ve dosyalar alt klasörlere taşınacak."
     parts = ", ".join(f"{k}={v!r}" for k, v in args.items())
     return f"{tool_name}({parts})"
 

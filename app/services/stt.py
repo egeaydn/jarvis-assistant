@@ -62,17 +62,26 @@ class SpeechToText:
             str  — tanınan metin
             None — anlaşılamadı veya timeout
         """
-        try:
-            with sr.Microphone() as source:
-                audio = self._recognizer.listen(
-                    source,
-                    timeout=self._timeout,
-                    phrase_time_limit=self._phrase_limit,
-                )
-        except sr.WaitTimeoutError:
-            return None  # Konuşma başlamadı
-        except OSError as exc:
-            raise RuntimeError(f"Mikrofon hatası: {exc}") from exc
+        import time
+        max_retries = 5
+        audio = None
+        
+        for attempt in range(max_retries):
+            try:
+                with sr.Microphone() as source:
+                    audio = self._recognizer.listen(
+                        source,
+                        timeout=self._timeout,
+                        phrase_time_limit=self._phrase_limit,
+                    )
+                break
+            except OSError as exc:
+                if attempt == max_retries - 1:
+                    raise RuntimeError(f"Mikrofon meşgul veya erişilemiyor: {exc}") from exc
+                time.sleep(0.2)  # Arka plan motorunun mikrofonu serbest bırakmasını bekle
+            except sr.WaitTimeoutError:
+                return None  # Konuşma başlamadı
+
 
         try:
             text = self._recognizer.recognize_google(

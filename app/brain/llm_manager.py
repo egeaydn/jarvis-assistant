@@ -29,19 +29,23 @@ class Provider(str, Enum):
 
 
 SYSTEM_PROMPT = (
-    "Sen Ege Assistant'sın — Türkçe konuşan, yardımcı bir AI masaüstü asistanısın.\n"
+    "Sen Jarvis'sin — Türkçe konuşan, yardımcı ve otonom bir AI masaüstü asistanısın.\n"
     "Kullanıcının Windows bilgisayarını araçlar (tools) aracılığıyla kontrol edebilirsin.\n"
     "\n"
     "Kurallar:\n"
     "- Kullanıcının isteğini analiz et; gerekirse uygun tool'u çağır.\n"
-    "- Karmaşık görevleri adımlara böl: önce bilgi topla (listele/bul), sonra işlem yap.\n"
+    "- Karmaşık veya belirsiz görevlerde (örneğin düzenleme kuralları net olmayan klasör düzenleme isteklerinde) işe başlamadan önce kullanıcıya soru sorup netleştir.\n"
+    "- Karmaşık görevleri adımlara böl: önce bilgi topla (listele/bul/oku), sonra işlem yap.\n"
+    "- Bir projeyi çalıştırma veya hata çözme görevi verildiğinde:\n"
+    "  1. Önce dizindeki dosyaları (package.json, requirements.txt vb.) listeleyip dili ve bağımlılıkları tespit et.\n"
+    "  2. run_terminal_command ile çalıştırmayı veya yüklemeyi dene.\n"
+    "  3. Hata alırsan hatanın çıktısını oku, analiz et ve çözmek için uygun komutları (örn. pip install) çalıştır.\n"
     "- Tool sonuçlarını değerlendir; eksik bilgi varsa bir sonraki tool'u çağır.\n"
     "- Tool sonucunu kısa ve doğal Türkçe ile özetle.\n"
     "- Tool gerekmiyorsa direkt yanıtla.\n"
     "- Gereksiz uzun açıklamalar yapma.\n"
-    "- Dosya silme veya taşıma işlemlerinde kullanıcıyı bilgilendir.\n"
-    "- Kullanıcı 'ekrana bak', 'ne goruyorsun', 'hata ne' gibi sorular sorarsa\n"
-    "  analyze_screen tool'unu kullan.\n"
+    "- Dosya silme, taşıma, klasör düzenleme veya terminal komutu çalıştırma işlemlerinde kullanıcıyı bilgilendir.\n"
+    "- Kullanıcı 'ekrana bak', 'ne goruyorsun', 'hata ne' gibi sorular sorarsa analyze_screen tool'unu kullan.\n"
 )
 
 # ── Groq / OpenAI formatı tool tanımları ─────────────────────────────────────
@@ -155,7 +159,25 @@ GROQ_TOOLS: List[dict] = [
         "parameters": {"type": "object",
             "properties": {"save_path": {"type": "string", "description": "Kayıt yolu (boş bırakılırsa Masaüstü'ne zaman damgalı kaydeder)"}},
             "required": []}}},
+    # ── Phase 9 — Autonomous Assistant ────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "run_terminal_command",
+        "description": "Belirtilen dizinde bir Windows terminal komutu (PowerShell) çalıştırır ve çıktısını döndürür. Projeleri çalıştırmak, bağımlılık kurmak veya test etmek için kullan. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Çalıştırılacak terminal komutu (örn: 'python main.py', 'pip install requests', 'npm start')"},
+                "cwd": {"type": "string", "description": "Komutun çalıştırılacağı dizin yolu veya kısa ismi (belgeler, masaüstü vb. - isteğe bağlı)"}},
+            "required": ["command"]}}},
+    {"type": "function", "function": {
+        "name": "organize_folder",
+        "description": "Belirtilen klasördeki dosyaları türlerine (Belgeler, Resimler, Arşivler vb.) göre analiz edip alt klasörlere taşır. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "folder_path": {"type": "string", "description": "Düzenlenecek klasörün yolu veya kısa ismi (örn: indirilenler, masaüstü)"},
+                "rule": {"type": "string", "description": "Düzenleme kuralı: 'tür' (default) veya 'uzantı'"}},
+            "required": ["folder_path"]}}},
 ]
+
 
 
 # ── Gemini formatı tool tanımları (lazy import) ───────────────────────────────
@@ -250,8 +272,22 @@ def _build_gemini_tools():
             parameters=gt.Schema(type=gt.Type.OBJECT, properties={
                 "save_path": gt.Schema(type=gt.Type.STRING, description="Kayıt yolu (boş birakilirsa Masaüstü'ne kaydeder)")},
                 required=[])),
+        # ── Phase 9 ─────────────────────────────────────────────────────────
+        gt.FunctionDeclaration(name="run_terminal_command",
+            description="Belirtilen dizinde terminal komutu çalıştırır. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "command": gt.Schema(type=gt.Type.STRING, description="Çalıştırılacak komut (python main.py vb.)"),
+                "cwd": gt.Schema(type=gt.Type.STRING, description="Çalışma dizini (isteğe bağlı)")},
+                required=["command"])),
+        gt.FunctionDeclaration(name="organize_folder",
+            description="Klasördeki dosyaları türlerine göre alt klasörlere taşıyarak düzenler. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "folder_path": gt.Schema(type=gt.Type.STRING, description="Düzenlenecek klasör yolu"),
+                "rule": gt.Schema(type=gt.Type.STRING, description="Kural: 'tür' veya 'uzantı'")},
+                required=["folder_path"])),
     ]
     return [gt.Tool(function_declarations=decls)]
+
 
 
 # ── Ortak yardımcı ────────────────────────────────────────────────────────────

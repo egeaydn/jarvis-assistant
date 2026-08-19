@@ -1,43 +1,44 @@
 """
-Phase 8 — UI Stil Dosyası (QSS / Qt Stylesheet).
+Phase v1.0 — High-Tech Sci-Fi Jarvis Stylesheet (QSS).
 
-Modern, karanlık (Catppuccin Mocha esintili), degradeler ve yumuşak köşeler
-içeren premium masaüstü asistanı tasarım teması.
+Tony Stark JARVIS stili holografik mavi/cyan neon tema.
+Yumuşak parlamalar, ince teknolojik sınırlar ve tamamen arındırılmış emojiler.
 """
 
 QSS = """
 /* ── Genel Pencere Ayarları ── */
 QMainWindow {
-    background-color: #11111b;
+    background-color: #030712;
 }
 
 QWidget {
-    color: #cdd6f4;
-    font-family: "Segoe UI", "Inter", sans-serif;
-    font-size: 14px;
+    color: #e0f2fe;
+    font-family: "Consolas", "Courier New", "Segoe UI", sans-serif;
+    font-size: 13px;
 }
 
 /* ── Panel Tasarımları ── */
 QFrame#sidePanel {
-    background-color: #181825;
-    border-right: 1px solid #313244;
+    background-color: #070e1b;
+    border-right: 1px solid #1e293b;
     border-radius: 0px;
 }
 
 QFrame#mainArea {
-    background-color: #11111b;
+    background-color: #030712;
 }
 
 /* ── Başlık Barı (Title Bar) ── */
 QFrame#titleBar {
-    background-color: #11111b;
-    border-bottom: 1px solid #1e1e2e;
+    background-color: #030712;
+    border-bottom: 1px solid #0f172a;
 }
 
 QLabel#titleLabel {
     font-weight: bold;
-    font-size: 15px;
-    color: #89b4fa;
+    font-size: 13px;
+    color: #38bdf8;
+    letter-spacing: 1px;
 }
 
 /* ── Sohbet Alanı (Scroll Area) ── */
@@ -52,165 +53,175 @@ QWidget#scrollContents {
 
 /* ── Konuşma Balonları ve Mesaj Kartları ── */
 QFrame#msgCard_user {
-    background-color: #313244;
-    border-radius: 12px;
-    border: 1px solid #45475a;
-    margin-left: 40px;
+    background-color: #0f172a;
+    border-radius: 6px;
+    border: 1px solid #1e293b;
+    margin-left: 50px;
     margin-right: 10px;
 }
 
 QFrame#msgCard_assistant {
-    background-color: #1e1e2e;
-    border-radius: 12px;
-    border: 1px solid #313244;
+    background-color: #0b1329;
+    border-radius: 6px;
+    border: 1px solid #334155;
     margin-left: 10px;
-    margin-right: 40px;
+    margin-right: 50px;
 }
 
 QFrame#msgCard_tool {
-    background-color: #181825;
-    border-radius: 8px;
-    border: 1px dashed #f38ba8;
+    background-color: #020617;
+    border-radius: 4px;
+    border: 1px dashed #0ea5e9;
     margin-left: 20px;
     margin-right: 20px;
 }
 
 QLabel#msgText {
-    color: #cdd6f4;
-    line-height: 1.4;
+    color: #f0f9ff;
+    line-height: 1.5;
 }
 
 QLabel#senderLabel {
     font-weight: bold;
     font-size: 11px;
+    letter-spacing: 1px;
 }
 
 QLabel#senderLabel_user {
-    color: #b4befe;
+    color: #38bdf8;
 }
 
 QLabel#senderLabel_assistant {
-    color: #a6e3a1;
+    color: #06b6d4;
 }
 
 QLabel#senderLabel_tool {
-    color: #f38ba8;
+    color: #0ea5e9;
 }
 
 /* ── Sistem Dashboard (Side Panel) ── */
 QLabel#sectionTitle {
     font-weight: bold;
-    font-size: 13px;
-    color: #cdd6f4;
+    font-size: 12px;
+    color: #38bdf8;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
 }
 
 QLabel#dbLabel {
-    color: #a6adc8;
-    font-size: 12px;
+    color: #94a3b8;
+    font-size: 11px;
 }
 
 QLabel#dbValue {
     font-weight: bold;
-    font-size: 14px;
-    color: #89b4fa;
+    font-size: 13px;
+    color: #00f0ff;
 }
 
 QProgressBar {
-    border: 1px solid #313244;
-    border-radius: 6px;
-    background-color: #11111b;
+    border: 1px solid #1e293b;
+    border-radius: 3px;
+    background-color: #020617;
     text-align: center;
     color: transparent;
-    height: 12px;
+    height: 6px;
 }
 
 QProgressBar::chunk {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #89b4fa, stop:1 #b4befe);
-    border-radius: 5px;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #00f0ff);
+    border-radius: 2px;
 }
 
 /* ── Giriş Alanı (Input Bar) ── */
 QFrame#inputContainer {
-    background-color: #181825;
-    border: 1px solid #313244;
-    border-radius: 20px;
+    background-color: #070e1b;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+}
+
+QFrame#inputContainer:focus-within {
+    border: 1px solid #00f0ff;
 }
 
 QLineEdit#inputField {
     background-color: transparent;
     border: none;
-    color: #cdd6f4;
-    padding-left: 10px;
-    font-size: 14px;
+    color: #f0f9ff;
+    padding-left: 5px;
+    font-size: 13px;
 }
 
 /* ── Butonlar ── */
 QPushButton#actionButton {
-    background-color: #313244;
-    border: none;
-    border-radius: 16px;
+    background-color: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 4px;
     width: 32px;
     height: 32px;
+    color: #38bdf8;
+    font-weight: bold;
 }
 
 QPushButton#actionButton:hover {
-    background-color: #45475a;
+    background-color: #1e293b;
+    border: 1px solid #38bdf8;
+    color: #00f0ff;
 }
 
 QPushButton#actionButton:pressed {
-    background-color: #585b70;
+    background-color: #334155;
 }
 
 QPushButton#micButton_active {
-    background-color: #f38ba8;
-    border-radius: 16px;
+    background-color: #083344;
+    border: 1px solid #06b6d4;
+    border-radius: 4px;
     width: 32px;
     height: 32px;
+    color: #22d3ee;
 }
 
 QPushButton#micButton_active:hover {
-    background-color: #eba0ac;
+    background-color: #155e75;
 }
 
 QPushButton#winButton {
     background-color: transparent;
     border: none;
-    border-radius: 4px;
-    color: #a6adc8;
-    font-size: 12px;
+    border-radius: 2px;
+    color: #64748b;
+    font-size: 11px;
     font-weight: bold;
     width: 24px;
     height: 24px;
 }
 
 QPushButton#winButton:hover {
-    background-color: #313244;
-    color: #cdd6f4;
+    background-color: #0f172a;
+    color: #38bdf8;
 }
 
 QPushButton#winButton_close:hover {
-    background-color: #f38ba8;
-    color: #11111b;
+    background-color: #7f1d1d;
+    color: #fca5a5;
 }
 
 /* ── Scrollbar Özelleştirme ── */
 QScrollBar:vertical {
     border: none;
-    background: #11111b;
-    width: 8px;
-    margin: 0px 0 0px 0;
+    background: #020617;
+    width: 6px;
 }
 
 QScrollBar::handle:vertical {
-    background: #313244;
+    background: #1e293b;
     min-height: 20px;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background: #45475a;
+    background: #334155;
 }
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
