@@ -1,10 +1,16 @@
-﻿"""
-Phase 4 — Çift-sağlayıcı LLM + Tool Calling.
+"""
+Phase 5 — AI Agent + Çift-sağlayıcı LLM + Tool Calling.
 
-Varsayılan: Groq (llama-3.3-70b-versatile) — OpenAI formatı, ücretsiz kota.
-Yedek   : Gemini (gemini-2.0-flash)          — Google genai SDK.
+Varsayılan: Groq  — OpenAI formatı, ücretsiz kota.
+Yedek     : Gemini — Google genai SDK.
 
 Sağlayıcı seçimi: LLM_PROVIDER=groq | gemini  (.env veya ortam değişkeni)
+
+Phase 5 eklemeleri:
+    - Agent-aware system prompt (çok adımlı görev farkındalığı)
+    - Yeni file manager tool'ları: list_directory, create_folder,
+      get_common_path, move_file, copy_file, delete_file,
+      get_file_info, filter_files_by_extension
 """
 
 import json
@@ -25,11 +31,15 @@ class Provider(str, Enum):
 SYSTEM_PROMPT = (
     "Sen Ege Assistant'sın — Türkçe konuşan, yardımcı bir AI masaüstü asistanısın.\n"
     "Kullanıcının Windows bilgisayarını araçlar (tools) aracılığıyla kontrol edebilirsin.\n"
+    "\n"
     "Kurallar:\n"
     "- Kullanıcının isteğini analiz et; gerekirse uygun tool'u çağır.\n"
+    "- Karmaşık görevleri adımlara böl: önce bilgi topla (listele/bul), sonra işlem yap.\n"
+    "- Tool sonuçlarını değerlendir; eksik bilgi varsa bir sonraki tool'u çağır.\n"
     "- Tool sonucunu kısa ve doğal Türkçe ile özetle.\n"
     "- Tool gerekmiyorsa direkt yanıtla.\n"
     "- Gereksiz uzun açıklamalar yapma.\n"
+    "- Dosya silme veya taşıma işlemlerinde kullanıcıyı bilgilendir.\n"
 )
 
 # ── Groq / OpenAI formatı tool tanımları ─────────────────────────────────────
@@ -73,6 +83,63 @@ GROQ_TOOLS: List[dict] = [
         "parameters": {"type": "object",
             "properties": {"filename": {"type": "string", "description": "Aranacak dosya adı veya kısmi ad"}},
             "required": ["filename"]}}},
+    # ── Phase 5 — Dosya / Klasör Yönetimi ────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "list_directory",
+        "description": "Bir klasördeki dosya ve alt klasörleri listeler. 'indirilenler', 'masaüstü', 'belgeler' gibi kısa isimler veya tam yol kabul eder.",
+        "parameters": {"type": "object",
+            "properties": {"path": {"type": "string", "description": "Listelenecek klasör yolu veya kısa ismi (örn: indirilenler, masaüstü)"}},
+            "required": ["path"]}}},
+    {"type": "function", "function": {
+        "name": "get_common_path",
+        "description": "Desktop, Downloads, Documents gibi yaygın klasörlerin tam Windows yolunu döndürür.",
+        "parameters": {"type": "object",
+            "properties": {"location": {"type": "string", "description": "Konum adı: desktop, masaüstü, downloads, indirilenler, documents, belgeler, pictures, music, videos"}},
+            "required": ["location"]}}},
+    {"type": "function", "function": {
+        "name": "create_folder",
+        "description": "Yeni bir klasör oluşturur. parent_path verilmezse Masaüstü'nde oluşturur.",
+        "parameters": {"type": "object",
+            "properties": {
+                "folder_name": {"type": "string", "description": "Oluşturulacak klasörün adı"},
+                "parent_path": {"type": "string", "description": "Ana klasör yolu veya kısa ismi (isteğe bağlı)"}},
+            "required": ["folder_name"]}}},
+    {"type": "function", "function": {
+        "name": "filter_files_by_extension",
+        "description": "Bir klasördeki dosyaları uzantıya göre filtreler. Örneğin PDF, MP3, JPG dosyalarını bulmak için kullanılır.",
+        "parameters": {"type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Klasör yolu veya kısa ismi (indirilenler, masaüstü...)"},
+                "extension": {"type": "string", "description": "Uzantı: pdf, mp3, jpg, txt, docx vb. (nokta olmadan da olur)"}},
+            "required": ["path", "extension"]}}},
+    {"type": "function", "function": {
+        "name": "get_file_info",
+        "description": "Bir dosya veya klasör hakkında meta bilgi döndürür (boyut, tarih, uzantı, tam yol).",
+        "parameters": {"type": "object",
+            "properties": {"filepath": {"type": "string", "description": "Bilgi alınacak dosya veya klasörün tam yolu"}},
+            "required": ["filepath"]}}},
+    {"type": "function", "function": {
+        "name": "move_file",
+        "description": "Bir dosyayı kaynak yoldan hedef yola taşır. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "src": {"type": "string", "description": "Kaynak dosya yolu"},
+                "dst": {"type": "string", "description": "Hedef klasör veya dosya yolu"}},
+            "required": ["src", "dst"]}}},
+    {"type": "function", "function": {
+        "name": "copy_file",
+        "description": "Bir dosyayı kaynak yoldan hedef yola kopyalar.",
+        "parameters": {"type": "object",
+            "properties": {
+                "src": {"type": "string", "description": "Kaynak dosya yolu"},
+                "dst": {"type": "string", "description": "Hedef klasör veya dosya yolu"}},
+            "required": ["src", "dst"]}}},
+    {"type": "function", "function": {
+        "name": "delete_file",
+        "description": "Belirtilen dosyayı kalıcı olarak siler. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {"filepath": {"type": "string", "description": "Silinecek dosyanın tam yolu"}},
+            "required": ["filepath"]}}},
 ]
 
 
@@ -112,6 +179,51 @@ def _build_gemini_tools():
             parameters=gt.Schema(type=gt.Type.OBJECT, properties={
                 "filename": gt.Schema(type=gt.Type.STRING, description="Aranacak dosya adı")},
                 required=["filename"])),
+        # ── Phase 5 ───────────────────────────────────────────────────────────
+        gt.FunctionDeclaration(name="list_directory",
+            description="Bir klasördeki dosya ve alt klasörleri listeler.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "path": gt.Schema(type=gt.Type.STRING, description="Klasör yolu veya kısa ismi: indirilenler, masaüstü, belgeler")},
+                required=["path"])),
+        gt.FunctionDeclaration(name="get_common_path",
+            description="Desktop, Downloads gibi yaygın klasörlerin tam yolunu döndürür.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "location": gt.Schema(type=gt.Type.STRING, description="Konum adı: desktop, downloads, documents, pictures, music, videos")},
+                required=["location"])),
+        gt.FunctionDeclaration(name="create_folder",
+            description="Yeni bir klasör oluşturur.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "folder_name": gt.Schema(type=gt.Type.STRING, description="Oluşturulacak klasörün adı"),
+                "parent_path": gt.Schema(type=gt.Type.STRING, description="Ana klasör yolu (isteğe bağlı)")},
+                required=["folder_name"])),
+        gt.FunctionDeclaration(name="filter_files_by_extension",
+            description="Bir klasördeki dosyaları uzantıya göre filtreler (pdf, mp3, jpg vb.).",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "path": gt.Schema(type=gt.Type.STRING, description="Klasör yolu veya kısa ismi"),
+                "extension": gt.Schema(type=gt.Type.STRING, description="Uzantı: pdf, mp3, jpg, txt vb.")},
+                required=["path", "extension"])),
+        gt.FunctionDeclaration(name="get_file_info",
+            description="Bir dosya veya klasör hakkında meta bilgi döndürür.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "filepath": gt.Schema(type=gt.Type.STRING, description="Dosya veya klasör tam yolu")},
+                required=["filepath"])),
+        gt.FunctionDeclaration(name="move_file",
+            description="Dosyayı kaynak yoldan hedef yola taşır. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "src": gt.Schema(type=gt.Type.STRING, description="Kaynak dosya yolu"),
+                "dst": gt.Schema(type=gt.Type.STRING, description="Hedef yol")},
+                required=["src", "dst"])),
+        gt.FunctionDeclaration(name="copy_file",
+            description="Dosyayı kaynak yoldan hedef yola kopyalar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "src": gt.Schema(type=gt.Type.STRING, description="Kaynak dosya yolu"),
+                "dst": gt.Schema(type=gt.Type.STRING, description="Hedef yol")},
+                required=["src", "dst"])),
+        gt.FunctionDeclaration(name="delete_file",
+            description="Dosyayı kalıcı olarak siler. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "filepath": gt.Schema(type=gt.Type.STRING, description="Silinecek dosyanın tam yolu")},
+                required=["filepath"])),
     ]
     return [gt.Tool(function_declarations=decls)]
 

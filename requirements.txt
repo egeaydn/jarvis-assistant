@@ -2,3 +2,7 @@ psutil
 google-genai
 groq
 python-dotenv
+# Phase 6 — Voice Assistant
+SpeechRecognition
+pyaudio
+pyttsx3
