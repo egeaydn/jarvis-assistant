@@ -7,22 +7,70 @@ import psutil
 
 
 APP_ALIASES: Dict[str, List[str]] = {
-    "chrome":   ["chrome", "google chrome", "googlechrome", "chrome.exe"],
-    "vscode":   ["vscode", "visual studio code", "code", "vs code", "code.exe"],
-    "notepad":  ["notepad", "notepad.exe"],
-    "discord":  ["discord", "discord.exe"],
-    "spotify":  ["spotify", "spotify.exe"],
-    "steam":    ["steam", "steam.exe"],
+    "chrome":    ["chrome", "google chrome", "googlechrome", "chrome.exe"],
+    "vscode":    ["vscode", "visual studio code", "code", "vs code", "code.exe"],
+    "notepad":   ["notepad", "notepad.exe"],
+    "discord":   ["discord", "discord.exe"],
+    "spotify":   ["spotify", "spotify.exe"],
+    "steam":     ["steam", "steam.exe"],
+    "explorer":  ["explorer", "dosyagezgini", "file explorer", "dosya gezgini", "explorer.exe"],
+    "edge":      ["edge", "microsoft edge", "msedge", "msedge.exe"],
+    "notepad++": ["notepad++", "notepadpp", "npp"],
+    "calculator":["calculator", "hesap makinesi", "calc", "calc.exe"],
+    "paint":     ["paint", "mspaint", "mspaint.exe"],
+    "wordpad":   ["wordpad", "wordpad.exe"],
 }
 
 # Her uygulama için psutil üzerinden aranacak process isimleri
 PROCESS_NAMES: Dict[str, List[str]] = {
-    "chrome":   ["chrome.exe"],
-    "vscode":   ["code.exe"],
-    "notepad":  ["notepad.exe"],
-    "discord":  ["discord.exe", "discordptb.exe", "discordcanary.exe"],
-    "spotify":  ["spotify.exe"],
-    "steam":    ["steam.exe"],
+    "chrome":    ["chrome.exe"],
+    "vscode":    ["code.exe"],
+    "notepad":   ["notepad.exe"],
+    "discord":   ["discord.exe", "discordptb.exe", "discordcanary.exe"],
+    "spotify":   ["spotify.exe"],
+    "steam":     ["steam.exe"],
+    "explorer":  ["explorer.exe"],
+    "edge":      ["msedge.exe"],
+    "notepad++": ["notepad++.exe"],
+    "calculator":["calculatorapp.exe", "calc.exe"],
+    "paint":     ["mspaint.exe"],
+    "wordpad":   ["wordpad.exe"],
+}
+
+# Ortam değişkeni destekli aday yollar
+_LOCALAPPDATA = os.environ.get("LOCALAPPDATA", "")
+_APPDATA      = os.environ.get("APPDATA", "")
+_PROGRAMFILES = os.environ.get("ProgramFiles", r"C:\Program Files")
+_PROGRAMFILES86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+
+APP_PATHS: Dict[str, List[str]] = {
+    "chrome": [
+        rf"{_PROGRAMFILES}\Google\Chrome\Application\chrome.exe",
+        rf"{_PROGRAMFILES86}\Google\Chrome\Application\chrome.exe",
+    ],
+    "vscode": [
+        rf"{_PROGRAMFILES}\Microsoft VS Code\Code.exe",
+        rf"{_PROGRAMFILES86}\Microsoft VS Code\Code.exe",
+    ],
+    "notepad":    ["notepad.exe"],
+    "discord":    [rf"{_LOCALAPPDATA}\Discord\Update.exe"],
+    "spotify":    [rf"{_APPDATA}\Spotify\Spotify.exe"],
+    "steam": [
+        rf"{_PROGRAMFILES86}\Steam\steam.exe",
+        rf"{_PROGRAMFILES}\Steam\steam.exe",
+    ],
+    "explorer":   ["explorer.exe"],
+    "edge": [
+        rf"{_PROGRAMFILES}\Microsoft\Edge\Application\msedge.exe",
+        rf"{_PROGRAMFILES86}\Microsoft\Edge\Application\msedge.exe",
+    ],
+    "notepad++": [
+        rf"{_PROGRAMFILES}\Notepad++\notepad++.exe",
+        rf"{_PROGRAMFILES86}\Notepad++\notepad++.exe",
+    ],
+    "calculator": ["calc.exe"],
+    "paint":      ["mspaint.exe"],
+    "wordpad":    ["wordpad.exe"],
 }
 
 
@@ -36,50 +84,54 @@ def _resolve_executable(app_name: str) -> Optional[str]:
     """Windows üzerinde çalıştırılabilir uygulama yolunu bulur."""
     normalized = _normalize_app_name(app_name)
 
-    for app_key, aliases in APP_ALIASES.items():
-        if normalized in [_normalize_app_name(alias) for alias in aliases]:
-            if app_key == "chrome":
-                candidates = [
-                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-                ]
-            elif app_key == "vscode":
-                candidates = [
-                    r"C:\Program Files\Microsoft VS Code\Code.exe",
-                    r"C:\Program Files (x86)\Microsoft VS Code\Code.exe",
-                ]
-            else:
-                candidates = ["notepad.exe"]
+    app_key = None
+    for key, aliases in APP_ALIASES.items():
+        if normalized in [_normalize_app_name(a) for a in aliases]:
+            app_key = key
+            break
 
-            for candidate in candidates:
-                if os.path.exists(candidate):
-                    return candidate
+    if app_key is None:
+        return None
 
-            if app_key == "vscode":
-                path_from_env = shutil.which("code")
-                if path_from_env:
-                    return path_from_env
-            if app_key == "chrome":
-                path_from_env = shutil.which("chrome")
-                if path_from_env:
-                    return path_from_env
-            if app_key == "notepad":
-                path_from_env = shutil.which("notepad")
-                if path_from_env:
-                    return path_from_env
+    # Discord: update.exe üzerinden başlat
+    if app_key == "discord":
+        update_exe = rf"{os.environ.get('LOCALAPPDATA', '')}\Discord\Update.exe"
+        if os.path.exists(update_exe):
+            return update_exe
+        return shutil.which("discord")
+
+    for candidate in APP_PATHS.get(app_key, []):
+        if os.path.exists(candidate):
+            return candidate
+
+    # PATH'te basit yürütülebilir isimle ara (Microsoft Store uygulamaları vb.)
+    for proc_name in PROCESS_NAMES.get(app_key, []):
+        found = shutil.which(proc_name)
+        if found:
+            return found
 
     return None
 
 
 def open_application(app_name: str) -> bool:
     """Belirtilen Windows uygulamasını açar."""
-    executable = _resolve_executable(app_name)
+    normalized = _normalize_app_name(app_name)
+    app_key = next(
+        (k for k, aliases in APP_ALIASES.items()
+         if normalized in [_normalize_app_name(a) for a in aliases]),
+        None,
+    )
 
+    executable = _resolve_executable(app_name)
     if not executable:
-        raise FileNotFoundError(f"'{app_name}' uygulaması bulunamadı veya PATH üzerinde yok.")
+        raise FileNotFoundError(f"'{app_name}' uygulaması bulunamadı.")
 
     try:
-        subprocess.Popen([executable], shell=False)
+        # Discord, Update.exe üzerinden özel argümanla başlatılır
+        if app_key == "discord":
+            subprocess.Popen([executable, "--processStart", "Discord.exe"], shell=False)
+        else:
+            subprocess.Popen([executable], shell=False)
         return True
     except OSError as exc:
         raise RuntimeError(f"'{app_name}' başlatılamadı: {exc}") from exc
