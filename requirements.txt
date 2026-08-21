@@ -6,6 +6,9 @@ python-dotenv
 SpeechRecognition
 pyaudio
 pyttsx3
+# Phase v2 — Wake Word (isteğe bağlı Porcupine)
+pvporcupine
+pvrecorder
 # Phase 7 — Screen Vision
 mss
 pillow

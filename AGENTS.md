@@ -1,0 +1,6 @@
+- project: Ege Assistant (Voice/Text AI Desktop Assistant)
+- tech_stack: Python 3.12+, psutil, subprocess, Ollama/LLM
+- rule_1: Keep code modular. Do not write all logic inside main.py.
+- rule_2: Use clean type hints and standard docstrings for every tool.
+- rule_3: Always write error handling (try-except) for OS/subprocess calls.
+- rule_4: Keep the roadmap phases in mind. Currently at Phase 1 (Computer Control).
