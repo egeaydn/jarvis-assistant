@@ -13,7 +13,6 @@ PySide6 tabanlı arayüz tasarımı.
 
 import sys
 import os
-import random
 import math
 from pathlib import Path
 from typing import Optional, Any
@@ -35,18 +34,10 @@ from app.brain.agent import Agent, AgentResult
 from app.brain.memory import AgentStepRecord
 from app.services.stt import SpeechToText
 from app.services.tts import TextToSpeech
-from app.services.wake_word import WakeWordEngine
+from app.services.assistant_state import AssistantState, AssistantStateManager
+from app.services.wake_word import GREETING_PHRASE, WakeWordEngine
 from app.config.startup import set_autostart, is_autostart_enabled
 from app.ui.styles import QSS
-
-# ── İngilizce Jarvis Karşılama İfadeleri ─────────────────────────────────────
-WAKE_RESPONSES = [
-    "Yes, sir?",
-    "At your service, sir.",
-    "Jarvis online. What do you require, sir?",
-    "Online and ready, sir.",
-    "I am here, sir."
-]
 
 
 # ── Arc Reactor Widget (Dijital Dönen Animasyonlu Gösterge) ───────────────────
@@ -119,6 +110,8 @@ class ArcReactorWidget(QWidget):
 
 class TTSWorker(QThread):
     """Sesi arka planda çalarak arayüzün donmasını engeller."""
+    finished_speaking = Signal()
+
     def __init__(self, tts: TextToSpeech, text: str) -> None:
         super().__init__()
         self.tts = tts
@@ -127,8 +120,10 @@ class TTSWorker(QThread):
     def run(self) -> None:
         try:
             self.tts.speak(self.text)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[TTS ERR] Seslendirme hatasi: {exc}")
+        finally:
+            self.finished_speaking.emit()
 
 
 class VoiceWorker(QThread):
@@ -236,6 +231,7 @@ class MainWindow(QMainWindow):
         self.voice_active = False
         self._drag_pos = None
         self._is_closing = False
+        self.state_manager = AssistantStateManager()
 
         # İşçiler
         self.agent_worker: Optional[AgentWorker] = None
@@ -253,8 +249,11 @@ class MainWindow(QMainWindow):
 
         # Wake Word Motorunu Başlat
         self.wake_word_signal.connect(self._on_wake_word_detected)
-        self.wake_word_engine = WakeWordEngine(lambda: self.wake_word_signal.emit())
-        self.wake_word_engine.start()
+        self.wake_word_engine = WakeWordEngine(
+            trigger_callback=lambda: self.wake_word_signal.emit(),
+            state_manager=self.state_manager,
+        )
+        self._start_wake_listening_if_idle()
 
         # Sistem Göstergesi Timer'ı
         self.sys_timer = QTimer(self)
@@ -435,35 +434,75 @@ class MainWindow(QMainWindow):
 
     def _setup_system_tray(self) -> None:
         self.tray_icon = QSystemTrayIcon(self)
-        
-        # Basit mavi kare ikon çizimi (Tema bağımlılığını kaldırmak için)
+
         from PySide6.QtGui import QPixmap, QPainter
         pix = QPixmap(16, 16)
         pix.fill(QColor("#00f0ff"))
         icon = QIcon(pix)
-            
+
         self.tray_icon.setIcon(icon)
-        self.tray_icon.setToolTip("Jarvis System UI")
+        self.tray_icon.setToolTip("Jarvis — Hey Jarvis ile uyandırın")
 
-        # Sağ tık menüsü
         menu = QMenu()
-        show_action = QAction("Open Interface", self)
-        show_action.triggered.connect(self._restore_window)
-        menu.addAction(show_action)
 
-        reset_action = QAction("Reset Memory", self)
-        reset_action.triggered.connect(self._reset_chat)
-        menu.addAction(reset_action)
+        self.show_action = QAction("Göster/Gizle", self)
+        self.show_action.triggered.connect(self._toggle_window_visibility)
+        menu.addAction(self.show_action)
+
+        self.mic_action = QAction("Mikrofonu Kapat", self)
+        self.mic_action.triggered.connect(self._toggle_microphone)
+        menu.addAction(self.mic_action)
 
         menu.addSeparator()
 
-        quit_action = QAction("Exit", self)
+        quit_action = QAction("Çıkış", self)
         quit_action.triggered.connect(self._quit_application)
         menu.addAction(quit_action)
 
         self.tray_icon.setContextMenu(menu)
         self.tray_icon.activated.connect(self._on_tray_icon_activated)
         self.tray_icon.show()
+
+    def _toggle_window_visibility(self) -> None:
+        """Tray menüsünden pencereyi göster veya gizle."""
+        if self.isVisible():
+            self.hide()
+        else:
+            self._restore_window()
+
+    def _toggle_microphone(self) -> None:
+        """Tray menüsünden mikrofon dinlemeyi aç/kapat."""
+        enabled = not self.state_manager.microphone_enabled
+        self.state_manager.set_microphone_enabled(enabled)
+        self.wake_word_engine.set_enabled(enabled)
+
+        if enabled:
+            self.mic_action.setText("Mikrofonu Kapat")
+            self._start_wake_listening_if_idle()
+            self.tray_icon.showMessage(
+                "Jarvis",
+                "Mikrofon dinlemesi açıldı.",
+                QSystemTrayIcon.Information,
+                2000,
+            )
+        else:
+            self.mic_action.setText("Mikrofonu Aç")
+            self.wake_word_engine.stop()
+            self.tray_icon.showMessage(
+                "Jarvis",
+                "Mikrofon dinlemesi kapatıldı.",
+                QSystemTrayIcon.Information,
+                2000,
+            )
+
+    def _start_wake_listening_if_idle(self) -> None:
+        """Yalnızca IDLE durumunda wake word dinlemesini başlatır."""
+        if self.state_manager.can_listen_for_wake_word():
+            self.wake_word_engine.start()
+
+    def _stop_wake_listening(self) -> None:
+        """Wake word dinlemesini durdurur."""
+        self.wake_word_engine.stop()
 
     def _on_tray_icon_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.Trigger:
@@ -477,20 +516,35 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: Any) -> None:
         """Pencere kapatıldığında uygulamayı kapatmak yerine tepsiye gizler."""
         if self._is_closing:
-            self.wake_word_engine.stop()
+            self._cleanup_audio()
             event.accept()
         else:
             event.ignore()
             self.hide()
             self.tray_icon.showMessage(
                 "Jarvis",
-                "Operating in background mode, sir. Speak 'Hey Jarvis' to wake me.",
+                "Arka planda çalışıyor. 'Hey Jarvis' deyin.",
                 QSystemTrayIcon.Information,
-                2000
+                2000,
             )
+
+    def _cleanup_audio(self) -> None:
+        """Çıkış öncesi ses dinleme kaynaklarını temizler."""
+        try:
+            self.wake_word_engine.stop()
+        except Exception as exc:
+            print(f"[CLEANUP WN] Wake word durdurulamadi: {exc}")
+
+        for worker in (self.voice_worker, self.tts_worker, self.agent_worker):
+            if worker is not None and worker.isRunning():
+                try:
+                    worker.wait(1500)
+                except Exception:
+                    pass
 
     def _quit_application(self) -> None:
         self._is_closing = True
+        self._cleanup_audio()
         self.close()
         QApplication.quit()
 
@@ -498,18 +552,47 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_wake_word_detected(self) -> None:
-        """Wake word uyanma sesi tetiklendiğinde çalışır."""
+        """Doğrulanmış wake word algılandığında karşılama ve komut dinleme başlatır."""
+        if self.state_manager.state is not AssistantState.IDLE_WAKE_LISTENING:
+            return
+
+        self._stop_wake_listening()
+        self.state_manager.transition_to(AssistantState.GREETING)
         self._restore_window()
 
-        # Rastgele İngilizce Jarvis karşılama cümlesi seç
-        response = random.choice(WAKE_RESPONSES)
+        self.add_message("Jarvis", GREETING_PHRASE, "assistant")
 
-        # Karşılama sesi çal
-        self.tts_worker = TTSWorker(self.tts, response)
+        self.tts_worker = TTSWorker(self.tts, GREETING_PHRASE)
+        self.tts_worker.finished_speaking.connect(self._on_greeting_finished)
         self.tts_worker.start()
 
-        # Otomatik dinlemeyi başlat (karşılama sesinin bitmesi için 1.4 saniye bekle)
-        QTimer.singleShot(1400, self._toggle_voice)
+    @Slot()
+    def _on_greeting_finished(self) -> None:
+        """Karşılama seslendirmesi bittiğinde komut dinlemeye geçer."""
+        if self._is_closing:
+            return
+
+        self.state_manager.transition_to(AssistantState.COMMAND_LISTENING)
+        self._begin_command_listening()
+
+    def _begin_command_listening(self) -> None:
+        """Wake word sonrası komut dinleme modunu başlatır."""
+        if self.voice_active:
+            return
+
+        self.voice_active = True
+        self.mic_btn.setObjectName("micButton_active")
+        self.mic_btn.setText("REC")
+        self.mic_btn.setStyle(self.mic_btn.style())
+
+        self._stop_wake_listening()
+
+        self.voice_worker = VoiceWorker(self.stt)
+        self.voice_worker.finished.connect(self._on_voice_finished)
+        self.voice_worker.status_changed.connect(
+            lambda s: self.input_field.setPlaceholderText(s)
+        )
+        self.voice_worker.start()
 
     # ── Otomatik Başlatma ──
 
@@ -589,8 +672,8 @@ class MainWindow(QMainWindow):
         self.send_btn.setEnabled(False)
         self.mic_btn.setEnabled(False)
 
-        # Wake word'ü geçici olarak kapat
-        self.wake_word_engine.stop()
+        self._stop_wake_listening()
+        self.state_manager.transition_to(AssistantState.PROCESSING)
 
         self.agent_worker = AgentWorker(self.agent, user_text)
         self.agent_worker.finished.connect(self._on_agent_finished)
@@ -612,32 +695,38 @@ class MainWindow(QMainWindow):
         # Asistan yanıtını ekle
         self.add_message("Jarvis", result.final_answer, "assistant")
 
-        self.wake_word_engine.start()
-
-        # ── Akıllı Konuşma Sınırlayıcı (Smart TTS Summarizer) ───────────────────
         speak_text = result.final_answer
-        
-        # Eğer asistan yanıtı uzunsa, sesli olarak sadece kısa bir özet söyler
+
         if len(speak_text) > 140:
             tools_called = [step.action for step in result.steps]
             if "run_terminal_command" in tools_called:
-                speak_text = "Terminal command executed, sir. Output is displayed on the screen."
+                speak_text = "Terminal komutu calistirildi efendim. Cikti ekranda."
             elif "organize_folder" in tools_called:
-                speak_text = "I have organized the folders according to your rules, sir."
+                speak_text = "Klasorleri duzenledim efendim."
             elif "analyze_screen" in tools_called:
-                speak_text = "Screen analysis complete, sir. Here is the detailed breakdown."
+                speak_text = "Ekran analizi tamamlandi efendim."
             elif "open_application" in tools_called:
-                speak_text = "Opening the requested application, sir."
+                speak_text = "Istediginiz uygulamayi aciyorum efendim."
             else:
-                # Varsayılan fallback: İlk cümleyi oku
-                first_sentence = speak_text.split('.')[0]
+                first_sentence = speak_text.split(".")[0]
                 if len(first_sentence) < 90:
-                    speak_text = first_sentence + ", sir."
+                    speak_text = first_sentence + " efendim."
                 else:
-                    speak_text = "I have displayed the requested information on your screen, sir."
+                    speak_text = "Istediginiz bilgiyi ekrana yazdim efendim."
 
+        self.state_manager.transition_to(AssistantState.SPEAKING)
         self.tts_worker = TTSWorker(self.tts, speak_text)
+        self.tts_worker.finished_speaking.connect(self._on_response_speaking_finished)
         self.tts_worker.start()
+
+    @Slot()
+    def _on_response_speaking_finished(self) -> None:
+        """Yanıt seslendirmesi bitince idle dinlemeye döner."""
+        if self._is_closing:
+            return
+
+        self.state_manager.reset_to_idle()
+        self._start_wake_listening_if_idle()
 
     @Slot(str, str)
     def _on_confirm_requested(self, tool_name: str, description: str) -> None:
@@ -658,20 +747,19 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _toggle_voice(self) -> None:
+        """Manuel VOICE butonu — komut dinleme modunu başlatır."""
         if self.voice_active:
             return
 
-        self.voice_active = True
-        self.mic_btn.setObjectName("micButton_active")
-        self.mic_btn.setText("REC")
-        self.mic_btn.setStyle(self.mic_btn.style())
+        current = self.state_manager.state
+        if current not in (
+            AssistantState.IDLE_WAKE_LISTENING,
+            AssistantState.COMMAND_LISTENING,
+        ):
+            return
 
-        self.wake_word_engine.stop()
-
-        self.voice_worker = VoiceWorker(self.stt)
-        self.voice_worker.finished.connect(self._on_voice_finished)
-        self.voice_worker.status_changed.connect(lambda s: self.input_field.setPlaceholderText(s))
-        self.voice_worker.start()
+        self.state_manager.transition_to(AssistantState.COMMAND_LISTENING)
+        self._begin_command_listening()
 
     @Slot(str)
     def _on_voice_finished(self, text: str) -> None:
@@ -681,11 +769,12 @@ class MainWindow(QMainWindow):
         self.mic_btn.setStyle(self.mic_btn.style())
         self.input_field.setPlaceholderText("Write a command or speak 'Hey Jarvis'...")
 
-        self.wake_word_engine.start()
-
         if text.strip():
             self.input_field.setText(text)
             self._send_message()
+        else:
+            self.state_manager.reset_to_idle()
+            self._start_wake_listening_if_idle()
 
     @Slot()
     def _reset_chat(self) -> None:
