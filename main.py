@@ -46,7 +46,7 @@ def build_tool_manager() -> ToolManager:
     tm.register("filter_files_by_extension","Klasoru uzantiya gore filtreler",             filter_files_by_extension,{"path": "str", "extension": "str"})
     tm.register("get_file_info",            "Dosya meta bilgisini dondurur",              get_file_info,            {"filepath": "str"})
     tm.register("move_file",                "Dosya tasir (guvenlik onayi gerektirir)",    move_file,                {"src": "str", "dst": "str"})
-    tm.register("copy_file",                "Dosya kopyalar",                             copy_file,                {"src": "str", "dst": "str"})
+    tm.register("copy_file",                "Dosya kopyalar (guvenlik onayi gerektirir)", copy_file,                {"src": "str", "dst": "str"})
     tm.register("delete_file",              "Dosya siler (guvenlik onayi gerektirir)",   delete_file,              {"filepath": "str"})
 
     # ── Phase 7 — Screen Vision ───────────────────────────────────────────
@@ -212,7 +212,7 @@ def main() -> None:
         llm = LLMManager(
             tool_executor=lambda name, args: tm.execute(name, **args)
         )
-    except EnvironmentError as exc:
+    except (EnvironmentError, ImportError, ValueError) as exc:
         print(f"[HATA] {exc}")
         sys.exit(1)
 
@@ -229,9 +229,30 @@ def main() -> None:
         run_text_mode(agent, llm.provider_name)
     else:
         # Varsayılan olarak modern masaüstü arayüzünü (GUI) başlat
-        stt = SpeechToText()
-        tts = TextToSpeech()
-        start_ui(agent, stt, tts)
+        _hide_console_window()
+        try:
+            stt = SpeechToText()
+            tts = TextToSpeech()
+            start_ui(agent, stt, tts)
+        except Exception as exc:
+            print(f"[HATA] Arayüz başlatılamadı: {exc}")
+            sys.exit(1)
+
+
+def _hide_console_window() -> None:
+    """`python main.py` ile başlatılınca görev çubuğunda ayrı bir python.exe
+    ikonu belirmemesi için konsol penceresini gizler (derlenmiş .exe zaten
+    konsolsuz calistigi icin bu no-op olur)."""
+    if sys.platform != "win32" or getattr(sys, "frozen", False):
+        return
+    try:
+        import ctypes
+
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE
+    except (AttributeError, OSError):
+        pass
 
 
 if __name__ == "__main__":

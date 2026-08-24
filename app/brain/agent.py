@@ -26,6 +26,7 @@ FINISH_TOKEN = "FINISH"  # LLM bu action'ı döndürdüğünde döngü biter
 CONFIRMATION_REQUIRED: set = {
     "delete_file",
     "move_file",
+    "copy_file",
     "run_terminal_command",
     "organize_folder",
 }
@@ -176,6 +177,10 @@ def _describe_action(tool_name: str, args: dict) -> str:
         src = args.get("src", "?")
         dst = args.get("dst", "?")
         return f"'{src}' → '{dst}' olarak TAŞINACAK"
+    if tool_name == "copy_file":
+        src = args.get("src", "?")
+        dst = args.get("dst", "?")
+        return f"'{src}' → '{dst}' konumuna KOPYALANACAK"
     if tool_name == "run_terminal_command":
         cmd = args.get("command", "?")
         cwd = args.get("cwd", "Mevcut dizin")

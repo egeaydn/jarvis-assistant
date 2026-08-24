@@ -32,8 +32,13 @@ _MIN_CONFIDENCE = 1.0
 # Aynı ses parçasında / kısa sürede tekrar tetiklemeyi engelle (saniye).
 _DEBOUNCE_SECONDS = 4.0
 
-# STT dili — "Hey Jarvis" İngilizce ifadesi için en-US.
-_WAKE_STT_LANGUAGE = "en-US"
+# Türkçe varsayılan wake word için tr-TR kullanılır. Gerekirse .env üzerinden
+# en-US gibi başka bir BCP-47 dil koduyla değiştirilebilir.
+_WAKE_STT_LANGUAGE = os.getenv("WAKE_STT_LANGUAGE", "tr-TR")
+
+# Google STT'nin iki kelimeyi ayrı ses parçaları olarak bölmemesi için yeterli
+# sessizlik payı. "Hey Jarvis" arasında kısa bir doğal duraklama olabilir.
+_WAKE_PAUSE_THRESHOLD = 0.9
 
 GREETING_PHRASE = "Merhaba efendim"
 
@@ -155,9 +160,10 @@ class WakeWordEngine:
         self._state = state_manager
         self._listener = MicrophoneListener(
             energy_threshold=350,
-            pause_threshold=0.55,
+            pause_threshold=_WAKE_PAUSE_THRESHOLD,
             phrase_time_limit=3.0,
         )
+        self._accepted_aliases = _load_wake_aliases()
         self._enabled = True
         self._last_trigger = 0.0
         self._lock = threading.Lock()
@@ -287,11 +293,11 @@ class WakeWordEngine:
             )
             print(f"[WAKE WORD DBG] STT: '{text}'")
 
-            confidence = validation_confidence(text)
+            confidence = validation_confidence(text, self._accepted_aliases)
             if confidence < _MIN_CONFIDENCE:
                 return
 
-            if not is_valid_wake_phrase(text):
+            if not is_valid_wake_phrase(text, self._accepted_aliases):
                 return
 
             with self._lock:
@@ -306,3 +312,16 @@ class WakeWordEngine:
             print(f"[WAKE WORD WN] STT API hatası: {exc}")
         except Exception as exc:
             print(f"[WAKE WORD ERR] Tanıma hatası: {exc}")
+
+
+def _load_wake_aliases() -> frozenset[str]:
+    """`.env` içindeki virgülle ayrılmış alternatif wake-word ifadelerini okur."""
+    raw_aliases = os.getenv("WAKE_WORD_ALIASES", "")
+    aliases = frozenset(
+        alias.strip()
+        for alias in raw_aliases.split(",")
+        if alias.strip()
+    )
+    if aliases:
+        print(f"[WAKE WORD INF] Ek tam eşleşmeli ifadeler yüklendi: {sorted(aliases)}")
+    return aliases

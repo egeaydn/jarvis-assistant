@@ -1,4 +1,5 @@
 psutil
+PySide6
 google-genai
 groq
 python-dotenv
@@ -11,4 +12,7 @@ pvporcupine
 pvrecorder
 # Phase 7 — Screen Vision
 mss
-pillow
+pillow
+# Development / packaging
+pytest
+pyinstaller

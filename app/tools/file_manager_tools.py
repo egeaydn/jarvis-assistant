@@ -98,7 +98,10 @@ def create_folder(folder_name: str, parent_path: Optional[str] = None) -> str:
     if new_folder.exists():
         raise FileExistsError(f"'{new_folder}' zaten mevcut.")
 
-    new_folder.mkdir(parents=True)
+    try:
+        new_folder.mkdir(parents=True)
+    except OSError as exc:
+        raise RuntimeError(f"'{new_folder}' klasörü oluşturulamadı: {exc}") from exc
     return str(new_folder)
 
 
@@ -121,7 +124,13 @@ def move_file(src: str, dst: str) -> str:
     if dst_path.is_dir():
         dst_path = dst_path / src_path.name
 
-    shutil.move(str(src_path), str(dst_path))
+    if dst_path.exists():
+        raise FileExistsError(f"Hedef zaten mevcut: '{dst_path}'")
+
+    try:
+        shutil.move(str(src_path), str(dst_path))
+    except OSError as exc:
+        raise RuntimeError(f"'{src_path}' taşınamadı: {exc}") from exc
     return f"'{src_path.name}' → '{dst_path}' taşındı."
 
 
@@ -142,7 +151,13 @@ def copy_file(src: str, dst: str) -> str:
     if dst_path.is_dir():
         dst_path = dst_path / src_path.name
 
-    shutil.copy2(str(src_path), str(dst_path))
+    if dst_path.exists():
+        raise FileExistsError(f"Hedef zaten mevcut: '{dst_path}'")
+
+    try:
+        shutil.copy2(str(src_path), str(dst_path))
+    except OSError as exc:
+        raise RuntimeError(f"'{src_path}' kopyalanamadı: {exc}") from exc
     return f"'{src_path.name}' → '{dst_path}' kopyalandı."
 
 
@@ -159,7 +174,10 @@ def delete_file(filepath: str) -> str:
     if path.is_dir():
         raise ValueError(f"'{filepath}' bir klasör. Klasör silme desteklenmiyor.")
 
-    path.unlink()
+    try:
+        path.unlink()
+    except OSError as exc:
+        raise RuntimeError(f"'{filepath}' silinemedi: {exc}") from exc
     return f"'{path.name}' silindi."
 
 

@@ -23,25 +23,13 @@ cases = [
     ("readme.md dosyasını bul",         "find_file",   "readme.md",           "readme.md"),
 ]
 
-passed = 0
-failed = 0
-for raw, exp_action, exp_target, exp_query in cases:
-    r = parse(raw)
-    ok = (
-        r["action"] == exp_action
-        and r["target"] == exp_target
-        and (exp_query is None or r.get("query") == exp_query)
-    )
-    status = "PASS" if ok else "FAIL"
-    if ok:
-        passed += 1
-    else:
-        failed += 1
-        print(f"[{status}] {raw!r}")
-        print(f"       beklenen  action={exp_action!r} target={exp_target!r} query={exp_query!r}")
-        print(f"       gelen     action={r['action']!r} target={r['target']!r} query={r.get('query')!r}")
-        continue
-    print(f"[{status}] {raw!r:45s}  action={r['action']!r:14s}  target={r['target']!r}")
+def test_parser_cases() -> None:
+    """Türkçe komut örneklerinin doğru action ve argümanlara dönüştüğünü doğrular."""
+    for raw, exp_action, exp_target, exp_query in cases:
+        result = parse(raw)
 
-print(f"\n{passed}/{passed+failed} test geçti.")
+        assert result["action"] == exp_action, raw
+        assert result["target"] == exp_target, raw
+        if exp_query is not None:
+            assert result.get("query") == exp_query, raw
 

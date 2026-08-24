@@ -1,4 +1,4 @@
-# 🤖 JARVIS — Autonomous Voice & Vision Desktop Assistant
+#  JARVIS — Autonomous Voice & Vision Desktop Assistant
 
 JARVIS (Just A Rather Very Intelligent System), Windows bilgisayarınızı ses, ekran görüntüsü ve terminal komutları aracılığıyla tamamen kontrol edebilmenizi sağlayan otonom ve modern bir yapay zekâ asistanıdır. 
 
@@ -6,23 +6,23 @@ Tony Stark'ın efsanevi asistanından ilham alan **holografik neon mavi HUD aray
 
 ---
 
-## 🚀 Öne Çıkan Özellikler
+##  Öne Çıkan Özellikler
 
 ### 1. 🎙️ Sesli Uyanma ve Akıllı Konuşma (Wake-Word & TTS)
 - **Düşük Gecikmeli Wake-Word**: Arka planda `"Hey Jarvis"` veya `"Jarvis"` dediğiniz anda asistanınız uyanır. En yüksek hassasiyet için İngilizce ve Türkçe paralel ses analiz motoru barındırır.
 - **Tony Stark Tarzı Seslendirme**: Uyanma anında rastgele seçilen İngilizce sesli yanıtlar verir (*"At your service, sir.", "Yes, sir?"* vb.).
 - **Akıllı Ses Sınırlayıcı (Smart TTS)**: Kısa yanıtları sesli okurken, uzun raporları veya komut çıktılarını sesli olarak özet geçerek ekrana yansıtır.
 
-### 2. 👁️ Ekran Analizi (Screen Vision)
+### 2.  Ekran Analizi (Screen Vision)
 - **Yüksek Hızlı Ekran Yakalama**: `mss` entegrasyonu sayesinde PyAutoGUI'ye kıyasla 3 kat daha hızlı ekran görüntüsü yakalar.
 - **Gemini 3.6 Flash Entegrasyonu**: Ekranda ne olduğunu analiz edebilir, terminaldeki kod hatalarını okuyabilir, web sitelerindeki arayüzleri yorumlayabilir.
 
-### 3. 🧠 Otonom ReAct Ajan Döngüsü (AI Agent)
+### 3.  Otonom ReAct Ajan Döngüsü (AI Agent)
 - **Çok Adımlı Planlama**: Tek bir komutla sırasıyla klasörleri arayabilir, dosyaları filtreleyebilir ve doğru aracı seçip çalıştırabilir.
 - **Terminal Komut Çalıştırma**: Projelerinizi test etmek, bağımlılık yüklemek veya kod çalıştırmak için terminal komutlarını (`PowerShell`) otonom yürütebilir.
 - **Akıllı Klasör Düzenleme**: Klasörlerdeki tüm dosyaları analiz ederek uzantılarına göre alt klasörlere (`Belgeler`, `Resimler`, `Arşivler` vb.) otomatik taşır.
 
-### 4. 🖥️ Bilim Kurgu HUD Arayüzü (PySide6)
+### 4.  Bilim Kurgu HUD Arayüzü (PySide6)
 - **Dönen Arc Reactor**: Yan panelde sürekli hareket eden ve nabız gibi atan holografik Arc Reactor dijital animasyonu.
 - **Neon Mavi Tema**: Koyu antrasit ve neon mavi çizgiler içeren tamamen emojilerden arındırılmış ciddi ve şık arayüz tasarımı.
 - **Sistem Tepsisi (Tray Icon)**: Kapat butonuna basıldığında arka plana (tepsiye) küçülür. Çift tıklama ile anında ekrana gelir.
@@ -33,7 +33,7 @@ Tony Stark'ın efsanevi asistanından ilham alan **holografik neon mavi HUD aray
 ## 🛠️ Kurulum Adımları
 
 ### 1. Gereksinimler
-Projenin çalışması için bilgisayarınızda **Python 3.10+** kurulu olmalıdır.
+Projenin çalışması için bilgisayarınızda **Python 3.12+** kurulu olmalıdır.
 
 ### 2. Bağımlılıkları Yükleme
 Proje klasörünü açın ve bir sanal ortam oluşturup paketleri kurun:
@@ -57,7 +57,7 @@ GROQ_API_KEY=your_groq_api_key_here
 
 ---
 
-## 💻 Kullanım Kılavuzu
+## Kullanım Kılavuzu
 
 ### Uygulamayı Çalıştırma
 ```bash
@@ -80,10 +80,11 @@ Derleme bittiğinde, bağımsız çalışan **`Jarvis.exe`** dosyasını **`dist
 
 ---
 
-## 🔒 Güvenlik Sistemi (Safety Confirmations)
+##  Güvenlik Sistemi (Safety Confirmations)
 Jarvis bilgisayarınızda kritik değişiklikler yapmadan önce onay ister.
 - Dosya Silme (`delete_file`)
 - Dosya Taşıma (`move_file`)
+- Dosya Kopyalama (`copy_file`)
 - Terminal Komutu Çalıştırma (`run_terminal_command`)
 - Klasör Düzenleme (`organize_folder`)
 
