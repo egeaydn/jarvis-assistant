@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Collection
 
 # Kabul edilen tam ifadeler (normalize edilmiş hâl).
 _ACCEPTED_EXACT: frozenset[str] = frozenset(
     {
         "hey jarvis",
         "heyjarvis",
+        "merhaba",
+        "merhaba ege",
+        "merhabaege",
     }
 )
 
@@ -63,13 +67,18 @@ def normalize_wake_text(text: str) -> str:
     return normalized
 
 
-def is_valid_wake_phrase(text: str) -> bool:
+def is_valid_wake_phrase(
+    text: str,
+    extra_phrases: Collection[str] = (),
+) -> bool:
     """
-    Metnin yalnızca geçerli bir "Hey Jarvis" ifadesi olup olmadığını denetler.
+    Metnin yalnızca geçerli bir wake-word ifadesi olup olmadığını denetler.
 
     Kabul edilenler:
         - ``hey jarvis`` (tam ifade, ek kelime yok)
         - ``heyjarvis`` (bitişik yazım)
+        - ``merhaba`` (Türkçe kısa wake word)
+        - ``merhaba ege`` (Türkçe varsayılan ifade)
 
     Reddedilenler:
         - ``jarvis``, ``hey``, ``hey jarvis gibi`` tek başına veya benzer kelimeler
@@ -77,6 +86,8 @@ def is_valid_wake_phrase(text: str) -> bool:
 
     Args:
         text: STT çıktısı.
+        extra_phrases: Kullanıcının yapılandırdığı, tam eşleşmesi gereken
+            alternatif wake-word ifadeleri.
 
     Returns:
         True yalnızca tam eşleşme varsa.
@@ -88,22 +99,32 @@ def is_valid_wake_phrase(text: str) -> bool:
     # Boşluksuz varyasyon.
     compact = normalized.replace(" ", "")
 
-    if normalized in _ACCEPTED_EXACT:
+    accepted = _ACCEPTED_EXACT | frozenset(
+        normalize_wake_text(phrase)
+        for phrase in extra_phrases
+        if normalize_wake_text(phrase)
+    )
+
+    if normalized in accepted:
         return True
-    if compact == "heyjarvis":
+    if compact in {phrase.replace(" ", "") for phrase in accepted}:
         return True
 
     return False
 
 
-def validation_confidence(text: str) -> float:
+def validation_confidence(
+    text: str,
+    extra_phrases: Collection[str] = (),
+) -> float:
     """
     Yerel güven skoru — yalnızca tam eşleşmede 1.0 döner.
 
     Args:
         text: STT çıktısı.
+        extra_phrases: Kullanıcının yapılandırdığı alternatif tam ifadeler.
 
     Returns:
         1.0 geçerli ifade, aksi halde 0.0.
     """
-    return 1.0 if is_valid_wake_phrase(text) else 0.0
+    return 1.0 if is_valid_wake_phrase(text, extra_phrases) else 0.0

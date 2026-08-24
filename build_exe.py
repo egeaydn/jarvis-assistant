@@ -37,6 +37,8 @@ def build_executable() -> None:
         "--windowed",          # Çalışırken arkada CMD/Siyah konsol penceresi açılmasın
         "--clean",             # Geçici build önbelleklerini temizle
         "--noconfirm",         # Üzerine yazma sorularını otomatik onayla
+        "--add-data=assets;assets",
+        "--icon=assets/ege-assistant-icon.ico",
         "main.py"
     ]
 

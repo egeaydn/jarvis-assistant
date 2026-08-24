@@ -36,8 +36,80 @@ from app.services.stt import SpeechToText
 from app.services.tts import TextToSpeech
 from app.services.assistant_state import AssistantState, AssistantStateManager
 from app.services.wake_word import GREETING_PHRASE, WakeWordEngine
-from app.config.startup import set_autostart, is_autostart_enabled
+from app.config.startup import (
+    is_autostart_enabled,
+    set_autostart,
+    set_windows_app_user_model_id,
+)
 from app.ui.styles import QSS
+
+
+def _application_icon() -> QIcon:
+    """Geliştirme ve PyInstaller paketlerinde uygulama simgesini yükler."""
+    icon_path = _icon_file_path()
+    return QIcon(str(icon_path)) if icon_path else QIcon()
+
+
+def _icon_file_path() -> Optional[Path]:
+    """Uygulama ikon dosyasının tam yolunu bulur (ICO tercih edilir)."""
+    bundle_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+    for name in ("ege-assistant-icon.ico", "ege-assistant-icon.png"):
+        path = bundle_root / "assets" / name
+        if path.exists():
+            return path
+    return None
+
+
+def _force_win32_taskbar_icon(window: QWidget, icon_path: Path) -> None:
+    """FramelessWindowHint kullanan pencerelerde Windows görev çubuğunun
+    python.exe simgesine düşmesini önlemek için HICON'u pencere sınıfına
+    doğrudan Win32 API ile yazar."""
+    if sys.platform != "win32" or icon_path.suffix.lower() != ".ico":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        # 64-bit'te varsayilan restype (c_int) HICON pointer'ini kirpar; acikca tanimla
+        user32.LoadImageW.restype = wintypes.HICON
+        user32.LoadImageW.argtypes = [
+            wintypes.HINSTANCE, wintypes.LPCWSTR, ctypes.c_uint,
+            ctypes.c_int, ctypes.c_int, ctypes.c_uint,
+        ]
+        user32.SendMessageW.restype = ctypes.c_ssize_t
+        user32.SendMessageW.argtypes = [
+            wintypes.HWND, ctypes.c_uint, wintypes.WPARAM, wintypes.LPARAM,
+        ]
+
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE = 0x00000010
+        LR_DEFAULTSIZE = 0x00000040
+        WM_SETICON = 0x0080
+        ICON_SMALL, ICON_BIG = 0, 1
+        GCLP_HICON, GCLP_HICONSM = -14, -34
+
+        hwnd = wintypes.HWND(int(window.winId()))
+        hicon = user32.LoadImageW(
+            None, str(icon_path), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE
+        )
+        if not hicon:
+            return
+        user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon)
+        user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon)
+
+        if ctypes.sizeof(ctypes.c_void_p) == 8:
+            user32.SetClassLongPtrW.restype = ctypes.c_ssize_t
+            user32.SetClassLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+            user32.SetClassLongPtrW(hwnd, GCLP_HICON, hicon)
+            user32.SetClassLongPtrW(hwnd, GCLP_HICONSM, hicon)
+        else:
+            user32.SetClassLongW.restype = ctypes.c_uint32
+            user32.SetClassLongW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_uint32]
+            user32.SetClassLongW(hwnd, GCLP_HICON, hicon)
+            user32.SetClassLongW(hwnd, GCLP_HICONSM, hicon)
+    except (AttributeError, OSError):
+        pass
 
 
 # ── Arc Reactor Widget (Dijital Dönen Animasyonlu Gösterge) ───────────────────
@@ -149,6 +221,7 @@ class AgentWorker(QThread):
     """Agent ReAct döngüsünü arka planda çalıştırır."""
     finished = Signal(object)  # AgentResult
     confirm_requested = Signal(str, str)  # tool_name, description -> ana pencereye onay sorusu
+    CONFIRMATION_TIMEOUT_MS = 300_000
 
     def __init__(self, agent: Agent, user_input: str) -> None:
         super().__init__()
@@ -168,8 +241,8 @@ class AgentWorker(QThread):
     def _confirm_bridge(self, tool_name: str, description: str, args: dict) -> bool:
         self.mutex.lock()
         self.confirm_requested.emit(tool_name, description)
-        self.cond.wait(self.mutex)
-        approved = self.confirm_approved
+        answered = self.cond.wait(self.mutex, self.CONFIRMATION_TIMEOUT_MS)
+        approved = answered and self.confirm_approved
         self.mutex.unlock()
         return approved
 
@@ -240,12 +313,18 @@ class MainWindow(QMainWindow):
 
         # Pencere Özellikleri
         self.setWindowTitle("JARVIS")
+        self.setWindowIcon(_application_icon())
         self.resize(780, 620)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint)
         self.setStyleSheet(QSS)
 
         self._setup_ui()
         self._setup_system_tray()
+
+        # Frameless pencerede görev çubuğunun python.exe simgesine düşmesini engeller
+        icon_path = _icon_file_path()
+        if icon_path:
+            _force_win32_taskbar_icon(self, icon_path)
 
         # Wake Word Motorunu Başlat
         self.wake_word_signal.connect(self._on_wake_word_detected)
@@ -435,13 +514,8 @@ class MainWindow(QMainWindow):
     def _setup_system_tray(self) -> None:
         self.tray_icon = QSystemTrayIcon(self)
 
-        from PySide6.QtGui import QPixmap, QPainter
-        pix = QPixmap(16, 16)
-        pix.fill(QColor("#00f0ff"))
-        icon = QIcon(pix)
-
-        self.tray_icon.setIcon(icon)
-        self.tray_icon.setToolTip("Jarvis — Hey Jarvis ile uyandırın")
+        self.tray_icon.setIcon(_application_icon())
+        self.tray_icon.setToolTip("Jarvis — Merhaba ile uyandırın")
 
         menu = QMenu()
 
@@ -512,6 +586,11 @@ class MainWindow(QMainWindow):
         self.show()
         self.raise_()
         self.activateWindow()
+        # Tepsiden geri açılışta görev çubuğu ikonunu yeniden uygula
+        icon_path = _icon_file_path()
+        if icon_path:
+            _force_win32_taskbar_icon(self, icon_path)
+
 
     def closeEvent(self, event: Any) -> None:
         """Pencere kapatıldığında uygulamayı kapatmak yerine tepsiye gizler."""
@@ -523,7 +602,7 @@ class MainWindow(QMainWindow):
             self.hide()
             self.tray_icon.showMessage(
                 "Jarvis",
-                "Arka planda çalışıyor. 'Hey Jarvis' deyin.",
+                "Arka planda çalışıyor. 'Merhaba' deyin.",
                 QSystemTrayIcon.Information,
                 2000,
             )
@@ -808,11 +887,18 @@ class MainWindow(QMainWindow):
 
 # ── Çalıştırma ──
 def start_ui(agent: Agent, stt: SpeechToText, tts: TextToSpeech) -> None:
+    set_windows_app_user_model_id()
     app = QApplication(sys.argv)
+    icon = _application_icon()
+    app.setWindowIcon(icon)
     app.setQuitOnLastWindowClosed(False)
     window = MainWindow(agent, stt, tts)
-    
+
     if "--minimized" not in sys.argv:
         window.show()
-        
+        # show() sonrası winId() geçerlidir — görev çubuğu ikonunu şimdi uygula
+        icon_path = _icon_file_path()
+        if icon_path:
+            _force_win32_taskbar_icon(window, icon_path)
+
     sys.exit(app.exec())

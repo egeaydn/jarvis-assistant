@@ -5,6 +5,7 @@ winreg kütüphanesini kullanarak kayıt defterine (registry) Jarvis assistant e
 Kayıt girdisi, bilgisayar açıldığında uygulamayı arka planda (tray modunda) başlatır.
 """
 
+import ctypes
 import os
 import sys
 import winreg
@@ -12,6 +13,24 @@ from typing import Tuple
 
 REG_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_VAL_NAME = "JarvisAssistant"
+APP_USER_MODEL_ID = "EgeAssistant.Jarvis"
+
+
+def set_windows_app_user_model_id() -> bool:
+    """Windows görev çubuğunda uygulamayı Python sürecinden ayırır.
+
+    Returns:
+        Kimlik başarıyla ayarlandıysa ``True``, aksi durumda ``False``.
+    """
+    if sys.platform != "win32":
+        return False
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+        return True
+    except (AttributeError, OSError) as exc:
+        print(f"[WINDOWS WN] AppUserModelID ayarlanamadı: {exc}")
+        return False
 
 
 def set_autostart(enabled: bool) -> Tuple[bool, str]:

@@ -44,7 +44,7 @@ SYSTEM_PROMPT = (
     "- Tool sonucunu kısa ve doğal Türkçe ile özetle.\n"
     "- Tool gerekmiyorsa direkt yanıtla.\n"
     "- Gereksiz uzun açıklamalar yapma.\n"
-    "- Dosya silme, taşıma, klasör düzenleme veya terminal komutu çalıştırma işlemlerinde kullanıcıyı bilgilendir.\n"
+    "- Dosya silme, taşıma, kopyalama, klasör düzenleme veya terminal komutu çalıştırma işlemlerinde kullanıcıyı bilgilendir.\n"
     "- Kullanıcı 'ekrana bak', 'ne goruyorsun', 'hata ne' gibi sorular sorarsa analyze_screen tool'unu kullan.\n"
 )
 
@@ -134,7 +134,7 @@ GROQ_TOOLS: List[dict] = [
             "required": ["src", "dst"]}}},
     {"type": "function", "function": {
         "name": "copy_file",
-        "description": "Bir dosyayı kaynak yoldan hedef yola kopyalar.",
+        "description": "Bir dosyayı kaynak yoldan hedef yola kopyalar. Güvenlik onayı gerektirir ve mevcut dosyanın üzerine yazmaz.",
         "parameters": {"type": "object",
             "properties": {
                 "src": {"type": "string", "description": "Kaynak dosya yolu"},
@@ -251,7 +251,7 @@ def _build_gemini_tools():
                 "dst": gt.Schema(type=gt.Type.STRING, description="Hedef yol")},
                 required=["src", "dst"])),
         gt.FunctionDeclaration(name="copy_file",
-            description="Dosyayı kaynak yoldan hedef yola kopyalar.",
+            description="Dosyayı kaynak yoldan hedef yola kopyalar. Güvenlik onayı gerektirir ve mevcut dosyanın üzerine yazmaz.",
             parameters=gt.Schema(type=gt.Type.OBJECT, properties={
                 "src": gt.Schema(type=gt.Type.STRING, description="Kaynak dosya yolu"),
                 "dst": gt.Schema(type=gt.Type.STRING, description="Hedef yol")},
