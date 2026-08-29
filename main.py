@@ -18,6 +18,7 @@ from app.tools.file_manager_tools import (
 )
 from app.tools.file_tools import find_file, open_file
 from app.tools.screen_tools import analyze_screen, capture_screenshot
+from app.tools.shopping_tools import search_products
 from app.tools.system_tools import get_system_info
 from app.tools.tool_manager import ToolManager
 from app.services.stt import SpeechToText
@@ -38,6 +39,7 @@ def build_tool_manager() -> ToolManager:
     tm.register("search_web",        "Google'da arama yapar",                   search_web,        {"query": "str"})
     tm.register("find_file",         "Dosya adina gore ev dizininde arar",     find_file,         {"filename": "str"})
     tm.register("open_file",         "Dosyayi varsayilan uygulama ile acar",   open_file,         {"filepath": "str"})
+    tm.register("search_products",   "Urunu alisveris sitelerinde arar ve Chrome'da sekme olarak acar", search_products, {"query": "str", "sites": "list[str] (opsiyonel)"})
 
     # ── Phase 5 — Dosya / Klasör Yönetimi ────────────────────────────────────
     tm.register("list_directory",           "Klasor icerigini listeler",                  list_directory,           {"path": "str"})

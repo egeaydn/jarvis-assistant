@@ -46,6 +46,14 @@ SYSTEM_PROMPT = (
     "- Gereksiz uzun açıklamalar yapma.\n"
     "- Dosya silme, taşıma, kopyalama, klasör düzenleme veya terminal komutu çalıştırma işlemlerinde kullanıcıyı bilgilendir.\n"
     "- Kullanıcı 'ekrana bak', 'ne goruyorsun', 'hata ne' gibi sorular sorarsa analyze_screen tool'unu kullan.\n"
+    "- Kullanıcı bir ürün satın almak / bulmak istediğini belirtirse ('... almak istiyorum', "
+    "'... arıyorum', '... satın alacağım' gibi ifadeler) search_products tool'unu çağır.\n"
+    "- search_products çağırırken 'query' parametresine kullanıcının tüm cümlesini DEĞİL, "
+    "sadece ürünü tanımlayan kısa anahtar kelimeleri gönder: ürün adı + varsa ölçü/renk/marka gibi "
+    "ayırt edici özellikler. Gereksiz sebep/bağlam kelimelerini (kimin için, neden istendiği vb.) at.\n"
+    "  Örnek: 'kardeşimin fotoğrafını asmak için 15x20 bir çerçeve arıyorum bulabilir misin' → "
+    "query='15x20 çerçeve'.\n"
+    "  Örnek: 'siyah renk 15x20 çerçeve arıyorum' → query='siyah 15x20 çerçeve'.\n"
 )
 
 # ── Groq / OpenAI formatı tool tanımları ─────────────────────────────────────
@@ -89,6 +97,14 @@ GROQ_TOOLS: List[dict] = [
         "parameters": {"type": "object",
             "properties": {"filename": {"type": "string", "description": "Aranacak dosya adı veya kısmi ad"}},
             "required": ["filename"]}}},
+    {"type": "function", "function": {
+        "name": "search_products",
+        "description": "Kullanicinin almak istedigi bir urunu Turkiye alisveris sitelerinde (Trendyol, Hepsiburada, Amazon, N11) arar; her sitenin arama sonucunu Chrome'da ayri sekme olarak acar.",
+        "parameters": {"type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "SADECE urun adi + olcu/renk/marka gibi ayirt edici ozellikler (kisa anahtar kelimeler). Kullanicinin tum cumlesini gonderme. Orn: 'kardesimin fotografini asmak icin 15x20 bir cerceve ariyorum' -> '15x20 cerceve'"},
+                "sites": {"type": "array", "items": {"type": "string"}, "description": "Opsiyonel: sadece belirli siteler (trendyol, hepsiburada, amazon, n11)"}},
+            "required": ["query"]}}},
     # ── Phase 5 — Dosya / Klasör Yönetimi ────────────────────────────────────
     {"type": "function", "function": {
         "name": "list_directory",
@@ -216,6 +232,12 @@ def _build_gemini_tools():
             parameters=gt.Schema(type=gt.Type.OBJECT, properties={
                 "filename": gt.Schema(type=gt.Type.STRING, description="Aranacak dosya adı")},
                 required=["filename"])),
+        gt.FunctionDeclaration(name="search_products",
+            description="Kullanıcının almak istediği bir ürünü Türkiye alışveriş sitelerinde (Trendyol, Hepsiburada, Amazon, N11) arar; sonuçları Chrome'da ayrı sekme olarak açar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "query": gt.Schema(type=gt.Type.STRING, description="SADECE ürün adı + ölçü/renk/marka gibi ayırt edici özellikler (kısa anahtar kelimeler). Kullanıcının tüm cümlesini gönderme. Örn: 'kardeşimin fotoğrafını asmak için 15x20 bir çerçeve arıyorum' -> '15x20 çerçeve'"),
+                "sites": gt.Schema(type=gt.Type.ARRAY, items=gt.Schema(type=gt.Type.STRING), description="Opsiyonel: sadece belirli siteler (trendyol, hepsiburada, amazon, n11)")},
+                required=["query"])),
         # ── Phase 5 ───────────────────────────────────────────────────────────
         gt.FunctionDeclaration(name="list_directory",
             description="Bir klasördeki dosya ve alt klasörleri listeler.",

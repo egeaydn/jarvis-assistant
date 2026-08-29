@@ -16,6 +16,7 @@ Sistem, klasik "if/else komut eşleştirme" mantığından uzaklaşıp bir **ReA
 - [Güvenlik Onay Sistemi](#güvenlik-onay-sistemi)
 - [Sesli Etkileşim Alt Sistemi](#sesli-etkileşim-alt-sistemi)
 - [Ekran Analizi (Screen Vision)](#ekran-analizi-screen-vision)
+- [Alışveriş Araması (Shopping Search)](#alışveriş-araması-shopping-search)
 - [Masaüstü Arayüzü (PySide6)](#masaüstü-arayüzü-pyside6)
 - [LLM Sağlayıcı Katmanı](#llm-sağlayıcı-katmanı)
 - [Kurulum](#kurulum)
@@ -86,6 +87,7 @@ ege-assistant/
 │   │   ├── file_tools.py            # Dosya arama/açma
 │   │   ├── file_manager_tools.py    # Klasör listeleme, taşıma, kopyalama, silme
 │   │   ├── browser_tools.py         # URL açma, web arama
+│   │   ├── shopping_tools.py        # Çoklu site ürün arama (Trendyol, Hepsiburada, Amazon, N11)
 │   │   ├── screen_tools.py          # Ekran analizi ve ekran görüntüsü alma sarmalayıcıları
 │   │   ├── system_tools.py          # CPU/RAM/Disk bilgisi
 │   │   └── autonomous_tools.py      # Terminal komutu çalıştırma, klasör düzenleme
@@ -106,6 +108,7 @@ ege-assistant/
     ├── test_toolmanager.py
     ├── test_parser.py
     ├── test_file_manager_tools.py
+    ├── test_shopping_tools.py
     └── test_wake_word_validator.py
 ```
 
@@ -152,6 +155,9 @@ Tüm araçlar `main.py > build_tool_manager()` içinde `ToolManager.register()` 
 **Tarayıcı / Web** (`browser_tools.py`)
 - `open_website(url)`, `search_web(query)`.
 
+**Alışveriş Araması** (`shopping_tools.py`)
+- `search_products(query, sites=None)` — girilen ürünü Trendyol, Hepsiburada, Amazon.com.tr ve N11'de arar; sonuç sayfalarını Chrome'da ayrı sekme olarak açar (Chrome bulunamazsa varsayılan tarayıcıya geri döner). Çalışma prensibinin ayrıntısı için bkz. [Alışveriş Araması (Shopping Search)](#alışveriş-araması-shopping-search) bölümü ve [docs/ALISVERIS-ARAMA-OZELLIGI.md](docs/ALISVERIS-ARAMA-OZELLIGI.md).
+
 **Dosya Arama** (`file_tools.py`)
 - `find_file(filename)`, `open_file(filepath)`.
 
@@ -197,6 +203,35 @@ Kullanıcı reddederse araç çalıştırılmaz; agent bu durumu `"İşlem kulla
 
 - `ScreenCapture` — `mss` kütüphanesi ile PyAutoGUI'ye kıyasla belirgin şekilde daha hızlı ekran/bölge yakalama yapar, PNG bytes veya dosya olarak döndürür.
 - `VisionAnalyzer` — yakalanan görüntüyü Gemini (`gemini-3.6-flash`) modeline gönderir. Groq görüntü girişini desteklemediği için, aktif LLM sağlayıcısı ne olursa olsun görsel analiz her zaman Gemini üzerinden yürütülür ve `GEMINI_API_KEY` zorunludur.
+
+---
+
+## Alışveriş Araması (Shopping Search)
+
+`app/tools/shopping_tools.py`, kullanıcının satın almak istediği bir ürünü Türkiye'de yaygın kullanılan alışveriş sitelerinde arayıp sonuç sayfalarını tarayıcıda sekme olarak açan bir araçtır. Bu modül veri kazıma (scraping) yapmaz; yalnızca ilgili sitenin arama sonucu URL'sini oluşturup açar, sanki kullanıcı o siteye girip kendisi aramış gibi bir deneyim sağlar.
+
+### Desteklenen siteler
+
+| Site | Arama URL Şablonu |
+|---|---|
+| Trendyol | `https://www.trendyol.com/sr?q={q}` |
+| Hepsiburada | `https://www.hepsiburada.com/ara?q={q}` |
+| Amazon.com.tr | `https://www.amazon.com.tr/s?k={q}` |
+| N11 | `https://www.n11.com/arama?q={q}` |
+
+`{q}`, aranacak ürün adının `urllib.parse.quote` ile kodlanmış halidir (boşluklar `%20` olarak kodlanır). `quote_plus`'ın ürettiği `+` karakteri bazı sitelerin arama kutusunda kelime ayracı olarak değil literal karakter olarak göründüğü için tercih edilmemiştir.
+
+### Çalışma akışı
+
+1. Kullanıcı bir satın alma niyeti belirttiğinde ("... almak istiyorum", "... arıyorum" gibi ifadeler), LLM `search_products(query, sites=None)` tool'unu çağırır.
+2. `SYSTEM_PROMPT` içindeki kural gereği LLM, `query` parametresine kullanıcının tüm cümlesini değil, yalnızca ürünü tanımlayan kısa anahtar kelimeleri (ürün adı + varsa ölçü/renk/marka gibi ayırt edici özellikler) gönderir. Örnek: "kardeşimin fotoğrafını asmak için 15x20 bir çerçeve arıyorum bulabilir misin" ifadesinden `query="15x20 çerçeve"` çıkarılır.
+3. `build_search_urls(query, sites)`, `SHOPPING_SITES` sözlüğündeki şablonları encode edilmiş sorgu ile doldurarak her site için bir URL üretir; `sites` parametresi verilmezse dört sitenin tamamı kullanılır, bilinmeyen site adları sessizce atlanır.
+4. `_find_chrome_path()`, `app_tools.APP_PATHS["chrome"]` içindeki aday kurulum yollarını kontrol ederek sistemde kurulu Chrome'un tam yolunu bulur.
+5. Chrome bulunursa `subprocess.Popen([chrome_path, *urls])` çağrılır; tüm URL'ler tek seferde process argümanı olarak verildiği için Chrome bunları aynı pencerede ayrı sekmeler halinde açar (Chrome zaten çalışıyorsa mevcut pencereye sekme eklenir).
+6. Chrome bulunamaz veya başlatma sırasında `OSError` oluşursa, `webbrowser.open(url, new=2)` ile sistemin varsayılan tarayıcısına geri dönülür.
+7. Fonksiyon `{"opened": [...], "failed": [...], "query": ...}` biçiminde bir sonuç döndürür; Agent bu sonucu kullanıcıya kısa bir Türkçe özet olarak iletir.
+
+Özelliğin kapsamı, tasarım kararları ve ileride eklenmesi planlanan siteler (Sahibinden, Dolap vb.) için bkz. [docs/ALISVERIS-ARAMA-OZELLIGI.md](docs/ALISVERIS-ARAMA-OZELLIGI.md).
 
 ---
 
@@ -342,6 +377,7 @@ Mevcut test dosyaları:
 - `tests/test_toolmanager.py` — `ToolManager` kayıt/çalıştırma davranışı
 - `tests/test_parser.py` — `app/brain/command_parser.py` içindeki Faz 2 anahtar kelime ayrıştırıcı
 - `tests/test_file_manager_tools.py` — dosya/klasör araçlarının uç durumları
+- `tests/test_shopping_tools.py` — `shopping_tools.py` içindeki URL oluşturma, site filtreleme ve Chrome/tarayıcı fallback senaryoları
 - `tests/test_wake_word_validator.py` — wake-word doğrulama kurallarının kabul/red senaryoları
 
 ---
