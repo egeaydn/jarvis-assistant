@@ -34,7 +34,7 @@ Asistan bunu bir **satın alma niyeti** olarak algılar ve:
 | Amazon.com.tr | `https://www.amazon.com.tr/s?k={q}` | Doğrulandı, Amazon genel arama formatı |
 | N11 | `https://www.n11.com/arama?q={q}` | Doğrulandı, stabil format |
 
-`{q}` = `urllib.parse.quote_plus(query)` ile URL-encode edilmiş sorgu.
+`{q}` = `urllib.parse.quote(query)` ile URL-encode edilmiş sorgu (boşluklar `%20` olarak kodlanır — `quote_plus`'ın ürettiği `+` bazı sitelerin arama kutusunda literal karakter olarak göründüğü için ilk implementasyondan sonra düzeltildi).
 
 ### Faz 2'ye bırakılacak (ikinci el / opsiyonel siteler)
 
@@ -156,7 +156,8 @@ Yeni kural eklenecek:
 
 ## 6. Güvenlik & Kod Kalitesi Notları
 
-- Sorgu, URL'ye eklenmeden önce mutlaka `urllib.parse.quote_plus` ile encode edilecek (mevcut `search_web` fonksiyonundaki pattern) → URL injection / kırık link riski engellenir.
+- Sorgu, URL'ye eklenmeden önce mutlaka `urllib.parse.quote` ile encode edilecek (boşluklar `%20`) → URL injection / kırık link riski engellenir ve arama kutusunda `+` görünmesi engellenir.
+- LLM, `search_products` çağırırken kullanıcının tüm cümlesini değil, sadece ürünü tanımlayan kısa anahtar kelimeleri (ürün adı + ölçü/renk/marka gibi ayırt edici özellikler) `query` parametresine göndermeli. Bu kural hem `SYSTEM_PROMPT`'a hem de Groq/Gemini tool açıklamalarına örneklerle eklendi (örn. "kardeşimin fotoğrafını asmak için 15x20 bir çerçeve arıyorum" → `query='15x20 çerçeve'`).
 - `sites` parametresiyle gelen değerler `SHOPPING_SITES` sözlüğünde whitelist kontrolünden geçirilecek; sözlükte olmayan bir site adı sessizce atlanacak (hata fırlatılmayacak, sadece `failed` listesine eklenecek).
 - Chrome process başlatma hataları (`FileNotFoundError`, `OSError`) `try/except` ile yakalanacak ve `webbrowser` fallback'ine düşülecek (AGENTS.md rule_3: OS/subprocess çağrılarında hata yönetimi).
 - Fonksiyonlara tip ipuçları (`str`, `Optional[List[str]]`, `Dict[str, Any]`) ve standart docstring eklenecek (AGENTS.md rule_2).
@@ -167,7 +168,7 @@ Yeni kural eklenecek:
 
 Var olan test tarzına uygun (bkz. `tests/test_file_manager_tools.py`) şu senaryolar test edilecek:
 
-1. `build_search_urls("masa lambası")` → 4 site için doğru encode edilmiş URL üretiyor mu (`%20` yerine `+` — `quote_plus` davranışı).
+1. `build_search_urls("masa lambası")` → 4 site için doğru encode edilmiş URL üretiyor mu (boşluk `%20` olarak kodlanmalı — `quote` davranışı).
 2. Boş sorgu → `ValueError`.
 3. `sites=["trendyol"]` verildiğinde sadece 1 URL üretiliyor mu.
 4. Bilinmeyen site adı (`sites=["xyz"]`) → sessizce atlanıyor, `failed` listesine düşüyor.
@@ -177,13 +178,13 @@ Var olan test tarzına uygun (bkz. `tests/test_file_manager_tools.py`) şu senar
 
 ## 8. Uygulama Adımları (Checklist — "başla" dendiğinde bu sırayla ilerlenecek)
 
-- [ ] `app/tools/shopping_tools.py` oluştur: `SHOPPING_SITES`, `build_search_urls`, `search_products`
-- [ ] `tests/test_shopping_tools.py` yaz ve çalıştır
-- [ ] `main.py` → import + `tm.register("search_products", ...)`
-- [ ] `app/brain/llm_manager.py` → `GROQ_TOOLS` + Gemini şemasına `search_products` ekle
-- [ ] `app/brain/agent.py` → `SYSTEM_PROMPT`'a satın alma niyeti kuralı ekle
+- [x] `app/tools/shopping_tools.py` oluştur: `SHOPPING_SITES`, `build_search_urls`, `search_products`
+- [x] `tests/test_shopping_tools.py` yaz ve çalıştır
+- [x] `main.py` → import + `tm.register("search_products", ...)`
+- [x] `app/brain/llm_manager.py` → `GROQ_TOOLS` + Gemini şemasına `search_products` ekle
+- [x] `app/brain/agent.py` → `SYSTEM_PROMPT`'a satın alma niyeti kuralı ekle (not: `SYSTEM_PROMPT` aslında `llm_manager.py` içinde tanımlı, orada güncellendi)
 - [ ] Manuel test: `python main.py --text` ile "masa lambası almak istiyorum" komutu dene, 4 sekmenin doğru açıldığını doğrula
-- [ ] README.md → "Araç (Tool) Kataloğu" bölümüne `search_products` satırı ekle
+- [x] README.md → "Araç (Tool) Kataloğu" bölümüne `search_products` satırı ekle
 - [ ] (Faz 2) Sahibinden / Dolap URL formatlarını canlı doğrula, `SHOPPING_SITES`'a ekle
 
 ---
