@@ -54,6 +54,12 @@ SYSTEM_PROMPT = (
     "  Örnek: 'kardeşimin fotoğrafını asmak için 15x20 bir çerçeve arıyorum bulabilir misin' → "
     "query='15x20 çerçeve'.\n"
     "  Örnek: 'siyah renk 15x20 çerçeve arıyorum' → query='siyah 15x20 çerçeve'.\n"
+    "- Kullanıcı 'günaydın' derse veya günlük özet isterse get_daily_briefing tool'unu kullan.\n"
+    "- set_reminder çağırırken 'when' parametresine kullanıcının doğal dil zaman ifadesini "
+    "olduğu gibi gönder (örn: 'yarın 15:00', '10 dakika sonra').\n"
+    "- send_email, shutdown_system, restart_system, sleep_system, bulk_delete, "
+    "set_registry_value, delete_registry_key, block_app_network gibi riskli araçları çağırmadan "
+    "önce kullanıcıya ne yapacağını kısaca özetle; onay sistemi zaten devreye girecektir.\n"
 )
 
 # ── Groq / OpenAI formatı tool tanımları ─────────────────────────────────────
@@ -192,7 +198,211 @@ GROQ_TOOLS: List[dict] = [
                 "folder_path": {"type": "string", "description": "Düzenlenecek klasörün yolu veya kısa ismi (örn: indirilenler, masaüstü)"},
                 "rule": {"type": "string", "description": "Düzenleme kuralı: 'tür' (default) veya 'uzantı'"}},
             "required": ["folder_path"]}}},
+    # ── Phase 10 — Pano (Clipboard) Yönetimi ─────────────────────────────────
+    {"type": "function", "function": {
+        "name": "copy_to_clipboard",
+        "description": "Verilen metni sistem panosuna kopyalar.",
+        "parameters": {"type": "object",
+            "properties": {"text": {"type": "string", "description": "Panoya kopyalanacak metin"}},
+            "required": ["text"]}}},
+    {"type": "function", "function": {
+        "name": "read_clipboard",
+        "description": "Panodaki güncel metni okur.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "get_clipboard_history",
+        "description": "Arka planda izlenen pano geçmişinden son N kaydı döndürür.",
+        "parameters": {"type": "object",
+            "properties": {"limit": {"type": "integer", "description": "Döndürülecek kayıt sayısı (varsayılan 5)"}},
+            "required": []}}},
+    # ── Phase 10 — Pencere Yönetimi ──────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "maximize_window",
+        "description": "Belirtilen uygulamanın açık penceresini tam ekran yapar.",
+        "parameters": {"type": "object",
+            "properties": {"app_name": {"type": "string", "description": "Uygulama adı (örn: chrome, discord)"}},
+            "required": ["app_name"]}}},
+    {"type": "function", "function": {
+        "name": "minimize_window",
+        "description": "Belirtilen uygulamanın açık penceresini küçültür.",
+        "parameters": {"type": "object",
+            "properties": {"app_name": {"type": "string", "description": "Uygulama adı"}},
+            "required": ["app_name"]}}},
+    {"type": "function", "function": {
+        "name": "close_window",
+        "description": "Belirtilen uygulamanın penceresini kapatır (uygulamayı sonlandırmaz).",
+        "parameters": {"type": "object",
+            "properties": {"app_name": {"type": "string", "description": "Uygulama adı"}},
+            "required": ["app_name"]}}},
+    {"type": "function", "function": {
+        "name": "focus_window",
+        "description": "Belirtilen uygulamanın penceresini öne getirir ve odaklar.",
+        "parameters": {"type": "object",
+            "properties": {"app_name": {"type": "string", "description": "Uygulama adı"}},
+            "required": ["app_name"]}}},
+    {"type": "function", "function": {
+        "name": "list_open_windows",
+        "description": "Açık pencerelerin başlıklarını listeler.",
+        "parameters": {"type": "object", "properties": {}}}},
+    # ── Phase 10 — Ses Seviyesi Kontrolü ─────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "set_volume",
+        "description": "Sistem ses seviyesini yüzde (0-100) olarak ayarlar.",
+        "parameters": {"type": "object",
+            "properties": {"percent": {"type": "integer", "description": "Ses seviyesi yüzdesi (0-100)"}},
+            "required": ["percent"]}}},
+    {"type": "function", "function": {
+        "name": "mute_volume",
+        "description": "Sistem sesini sessize alır veya açar.",
+        "parameters": {"type": "object",
+            "properties": {"mute": {"type": "boolean", "description": "True: sessize al, False: sesi aç"}},
+            "required": []}}},
+    {"type": "function", "function": {
+        "name": "get_volume",
+        "description": "Mevcut ses seviyesini (%) ve sessiz durumunu döndürür.",
+        "parameters": {"type": "object", "properties": {}}}},
+    # ── Phase 10 — Hızlı Not Alma ─────────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "add_note",
+        "description": "Zaman damgalı bir not ekler.",
+        "parameters": {"type": "object",
+            "properties": {
+                "content": {"type": "string", "description": "Not içeriği"},
+                "tag": {"type": "string", "description": "Opsiyonel etiket"}},
+            "required": ["content"]}}},
+    {"type": "function", "function": {
+        "name": "list_notes",
+        "description": "Kayıtlı notları en yeniden eskiye doğru listeler.",
+        "parameters": {"type": "object",
+            "properties": {
+                "tag": {"type": "string", "description": "Sadece bu etiketli notları getir (opsiyonel)"},
+                "limit": {"type": "integer", "description": "Maksimum kayıt sayısı (varsayılan 10)"}},
+            "required": []}}},
+    {"type": "function", "function": {
+        "name": "search_notes",
+        "description": "Not içeriğinde metin araması yapar.",
+        "parameters": {"type": "object",
+            "properties": {"query": {"type": "string", "description": "Aranacak metin"}},
+            "required": ["query"]}}},
+    # ── Phase 10 — Hatırlatıcı & Alarm ────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "set_reminder",
+        "description": "Doğal dil zaman ifadesiyle ('yarın 15:00', '10 dakika sonra') hatırlatıcı kurar.",
+        "parameters": {"type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "Hatırlatıcı mesajı"},
+                "when": {"type": "string", "description": "Doğal dil zaman ifadesi: 'yarın 15:00', '10 dakika sonra', 'bugün 20:30'"}},
+            "required": ["message", "when"]}}},
+    {"type": "function", "function": {
+        "name": "list_reminders",
+        "description": "Bekleyen (henüz tetiklenmemiş) tüm hatırlatıcıları listeler.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "cancel_reminder",
+        "description": "Belirtilen ID'ye sahip hatırlatıcıyı iptal eder.",
+        "parameters": {"type": "object",
+            "properties": {"reminder_id": {"type": "string", "description": "İptal edilecek hatırlatıcının ID'si"}},
+            "required": ["reminder_id"]}}},
+    # ── Phase 10 — Dosya Güvenliği (Recycle Bin) ─────────────────────────────
+    {"type": "function", "function": {
+        "name": "move_to_recycle_bin",
+        "description": "Bir dosyayı kalıcı silmek yerine Geri Dönüşüm Kutusu'na taşır (geri alınabilir). GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {"filepath": {"type": "string", "description": "Taşınacak dosyanın tam yolu"}},
+            "required": ["filepath"]}}},
+    {"type": "function", "function": {
+        "name": "bulk_delete",
+        "description": "Bir klasörde verilen glob desenine (örn. '*.tmp') uyan tüm dosyaları Geri Dönüşüm Kutusu'na taşır. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "folder_path": {"type": "string", "description": "Klasör yolu veya kısa ismi"},
+                "pattern": {"type": "string", "description": "Glob deseni, örn: '*.tmp', '*.log'"}},
+            "required": ["folder_path", "pattern"]}}},
+    # ── Phase 10 — E-posta Gönderme ───────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "send_email",
+        "description": "SMTP üzerinden e-posta gönderir. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "to": {"type": "string", "description": "Alıcı e-posta adresi"},
+                "subject": {"type": "string", "description": "E-posta konusu"},
+                "body": {"type": "string", "description": "E-posta gövdesi"},
+                "attachments": {"type": "array", "items": {"type": "string"}, "description": "Opsiyonel ek dosya yolları"}},
+            "required": ["to", "subject", "body"]}}},
+    # ── Phase 10 — Sabah Brifingi ─────────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "get_daily_briefing",
+        "description": "Hava durumu, sistem durumu (CPU/RAM/Disk) ve bugüne ait bekleyen hatırlatıcıları tek bir özet olarak döndürür. 'günaydın' gibi selamlamalarda kullan.",
+        "parameters": {"type": "object",
+            "properties": {"city": {"type": "string", "description": "Hava durumu için şehir adı (opsiyonel, varsayılan .env'den okunur)"}},
+            "required": []}}},
+    # ── Phase 10 — Sistem Güç Yönetimi ────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "shutdown_system",
+        "description": "Bilgisayarı belirtilen bekleme süresinden sonra kapatır. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {"delay_seconds": {"type": "integer", "description": "Kapatmadan önce bekleme süresi, saniye (varsayılan 30)"}},
+            "required": []}}},
+    {"type": "function", "function": {
+        "name": "restart_system",
+        "description": "Bilgisayarı belirtilen bekleme süresinden sonra yeniden başlatır. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {"delay_seconds": {"type": "integer", "description": "Yeniden başlatmadan önce bekleme süresi, saniye (varsayılan 30)"}},
+            "required": []}}},
+    {"type": "function", "function": {
+        "name": "sleep_system",
+        "description": "Bilgisayarı uyku moduna alır. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "cancel_shutdown",
+        "description": "Zamanlanmış kapatma/yeniden başlatma işlemini iptal eder. Onay gerektirmez.",
+        "parameters": {"type": "object", "properties": {}}}},
+    # ── Phase 10 — Ağ/Firewall Kontrolü ──────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "toggle_wifi",
+        "description": "Belirtilen ağ arayüzünü açar veya kapatır. Kapatma (enable=false) GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "enable": {"type": "boolean", "description": "True: aç, False: kapat"},
+                "interface_name": {"type": "string", "description": "Ağ arayüzü adı (varsayılan 'Wi-Fi')"}},
+            "required": ["enable"]}}},
+    {"type": "function", "function": {
+        "name": "block_app_network",
+        "description": "Belirtilen uygulamanın internet erişimini Windows Firewall ile engeller. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {"app_path": {"type": "string", "description": "Engellenecek uygulamanın tam .exe yolu"}},
+            "required": ["app_path"]}}},
+    # ── Phase 10 — Kayıt Defteri (yalnızca HKCU) ─────────────────────────────
+    {"type": "function", "function": {
+        "name": "set_registry_value",
+        "description": "HKEY_CURRENT_USER (HKCU) altında bir registry değeri oluşturur/günceller. Başka hive desteklenmez. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "hive": {"type": "string", "description": "Yalnızca 'HKEY_CURRENT_USER' veya 'HKCU' kabul edilir"},
+                "key_path": {"type": "string", "description": "Registry anahtar yolu, örn: 'Software\\\\MyApp'"},
+                "value_name": {"type": "string", "description": "Değer adı"},
+                "value_data": {"type": "string", "description": "Yazılacak veri"},
+                "value_type": {"type": "string", "description": "REG_SZ, REG_DWORD, REG_EXPAND_SZ veya REG_MULTI_SZ (varsayılan REG_SZ)"}},
+            "required": ["hive", "key_path", "value_name", "value_data"]}}},
+    {"type": "function", "function": {
+        "name": "delete_registry_key",
+        "description": "HKEY_CURRENT_USER (HKCU) altında bir registry anahtarını siler. Başka hive desteklenmez. GÜVENLİK ONAYI GEREKTİRİR.",
+        "parameters": {"type": "object",
+            "properties": {
+                "hive": {"type": "string", "description": "Yalnızca 'HKEY_CURRENT_USER' veya 'HKCU' kabul edilir"},
+                "key_path": {"type": "string", "description": "Silinecek registry anahtar yolu"}},
+            "required": ["hive", "key_path"]}}},
+    # ── Phase 10 — Konuşma / Agent Geçmişinde Arama ──────────────────────────
+    {"type": "function", "function": {
+        "name": "search_agent_history",
+        "description": "Kalıcı agent adımı geçmişinde tarih ve anahtar kelimeye göre arama yapar. 'geçen hafta ne yapmıştık' gibi sorularda kullan.",
+        "parameters": {"type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Aranacak anahtar kelime (opsiyonel)"},
+                "days_back": {"type": "integer", "description": "Kaç gün geriye bakılacağı (varsayılan 7)"}},
+            "required": []}}},
 ]
+
 
 
 
@@ -307,6 +517,170 @@ def _build_gemini_tools():
                 "folder_path": gt.Schema(type=gt.Type.STRING, description="Düzenlenecek klasör yolu"),
                 "rule": gt.Schema(type=gt.Type.STRING, description="Kural: 'tür' veya 'uzantı'")},
                 required=["folder_path"])),
+        # ── Phase 10 — Pano (Clipboard) ────────────────────────────────────────
+        gt.FunctionDeclaration(name="copy_to_clipboard",
+            description="Verilen metni sistem panosuna kopyalar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "text": gt.Schema(type=gt.Type.STRING, description="Panoya kopyalanacak metin")},
+                required=["text"])),
+        gt.FunctionDeclaration(name="read_clipboard",
+            description="Panodaki güncel metni okur.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={})),
+        gt.FunctionDeclaration(name="get_clipboard_history",
+            description="Pano geçmişinden son N kaydı döndürür.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "limit": gt.Schema(type=gt.Type.INTEGER, description="Kayıt sayısı (varsayılan 5)")},
+                required=[])),
+        # ── Phase 10 — Pencere Yönetimi ─────────────────────────────────────────
+        gt.FunctionDeclaration(name="maximize_window",
+            description="Uygulamanın penceresini tam ekran yapar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "app_name": gt.Schema(type=gt.Type.STRING, description="Uygulama adı")},
+                required=["app_name"])),
+        gt.FunctionDeclaration(name="minimize_window",
+            description="Uygulamanın penceresini küçültür.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "app_name": gt.Schema(type=gt.Type.STRING, description="Uygulama adı")},
+                required=["app_name"])),
+        gt.FunctionDeclaration(name="close_window",
+            description="Uygulamanın penceresini kapatır.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "app_name": gt.Schema(type=gt.Type.STRING, description="Uygulama adı")},
+                required=["app_name"])),
+        gt.FunctionDeclaration(name="focus_window",
+            description="Uygulamanın penceresine odaklanır.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "app_name": gt.Schema(type=gt.Type.STRING, description="Uygulama adı")},
+                required=["app_name"])),
+        gt.FunctionDeclaration(name="list_open_windows",
+            description="Açık pencerelerin başlıklarını listeler.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={})),
+        # ── Phase 10 — Ses Seviyesi Kontrolü ────────────────────────────────────
+        gt.FunctionDeclaration(name="set_volume",
+            description="Sistem ses seviyesini yüzde (0-100) olarak ayarlar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "percent": gt.Schema(type=gt.Type.INTEGER, description="Ses seviyesi yüzdesi")},
+                required=["percent"])),
+        gt.FunctionDeclaration(name="mute_volume",
+            description="Sistem sesini sessize alır veya açar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "mute": gt.Schema(type=gt.Type.BOOLEAN, description="True: sessize al, False: aç")},
+                required=[])),
+        gt.FunctionDeclaration(name="get_volume",
+            description="Mevcut ses seviyesini ve sessiz durumunu döndürür.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={})),
+        # ── Phase 10 — Hızlı Not Alma ────────────────────────────────────────────
+        gt.FunctionDeclaration(name="add_note",
+            description="Zaman damgalı bir not ekler.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "content": gt.Schema(type=gt.Type.STRING, description="Not içeriği"),
+                "tag": gt.Schema(type=gt.Type.STRING, description="Opsiyonel etiket")},
+                required=["content"])),
+        gt.FunctionDeclaration(name="list_notes",
+            description="Kayıtlı notları listeler.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "tag": gt.Schema(type=gt.Type.STRING, description="Etiket filtresi (opsiyonel)"),
+                "limit": gt.Schema(type=gt.Type.INTEGER, description="Maksimum kayıt sayısı")},
+                required=[])),
+        gt.FunctionDeclaration(name="search_notes",
+            description="Not içeriğinde metin araması yapar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "query": gt.Schema(type=gt.Type.STRING, description="Aranacak metin")},
+                required=["query"])),
+        # ── Phase 10 — Hatırlatıcı & Alarm ───────────────────────────────────────
+        gt.FunctionDeclaration(name="set_reminder",
+            description="Doğal dil zaman ifadesiyle hatırlatıcı kurar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "message": gt.Schema(type=gt.Type.STRING, description="Hatırlatıcı mesajı"),
+                "when": gt.Schema(type=gt.Type.STRING, description="Doğal dil zaman ifadesi: 'yarın 15:00', '10 dakika sonra'")},
+                required=["message", "when"])),
+        gt.FunctionDeclaration(name="list_reminders",
+            description="Bekleyen hatırlatıcıları listeler.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={})),
+        gt.FunctionDeclaration(name="cancel_reminder",
+            description="Bir hatırlatıcıyı iptal eder.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "reminder_id": gt.Schema(type=gt.Type.STRING, description="Hatırlatıcı ID'si")},
+                required=["reminder_id"])),
+        # ── Phase 10 — Dosya Güvenliği (Recycle Bin) ─────────────────────────────
+        gt.FunctionDeclaration(name="move_to_recycle_bin",
+            description="Dosyayı Geri Dönüşüm Kutusu'na taşır (geri alınabilir). Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "filepath": gt.Schema(type=gt.Type.STRING, description="Taşınacak dosyanın tam yolu")},
+                required=["filepath"])),
+        gt.FunctionDeclaration(name="bulk_delete",
+            description="Klasörde desene uyan tüm dosyaları Geri Dönüşüm Kutusu'na taşır. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "folder_path": gt.Schema(type=gt.Type.STRING, description="Klasör yolu"),
+                "pattern": gt.Schema(type=gt.Type.STRING, description="Glob deseni, örn: '*.tmp'")},
+                required=["folder_path", "pattern"])),
+        # ── Phase 10 — E-posta Gönderme ──────────────────────────────────────────
+        gt.FunctionDeclaration(name="send_email",
+            description="SMTP üzerinden e-posta gönderir. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "to": gt.Schema(type=gt.Type.STRING, description="Alıcı e-posta adresi"),
+                "subject": gt.Schema(type=gt.Type.STRING, description="Konu"),
+                "body": gt.Schema(type=gt.Type.STRING, description="Gövde"),
+                "attachments": gt.Schema(type=gt.Type.ARRAY, items=gt.Schema(type=gt.Type.STRING), description="Ek dosya yolları (opsiyonel)")},
+                required=["to", "subject", "body"])),
+        # ── Phase 10 — Sabah Brifingi ─────────────────────────────────────────────
+        gt.FunctionDeclaration(name="get_daily_briefing",
+            description="Hava durumu, sistem durumu ve bekleyen hatırlatıcıları özetler.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "city": gt.Schema(type=gt.Type.STRING, description="Şehir adı (opsiyonel)")},
+                required=[])),
+        # ── Phase 10 — Sistem Güç Yönetimi ───────────────────────────────────────
+        gt.FunctionDeclaration(name="shutdown_system",
+            description="Bilgisayarı kapatır. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "delay_seconds": gt.Schema(type=gt.Type.INTEGER, description="Bekleme süresi, saniye")},
+                required=[])),
+        gt.FunctionDeclaration(name="restart_system",
+            description="Bilgisayarı yeniden başlatır. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "delay_seconds": gt.Schema(type=gt.Type.INTEGER, description="Bekleme süresi, saniye")},
+                required=[])),
+        gt.FunctionDeclaration(name="sleep_system",
+            description="Bilgisayarı uyku moduna alır. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={})),
+        gt.FunctionDeclaration(name="cancel_shutdown",
+            description="Zamanlanmış kapatma/yeniden başlatmayı iptal eder. Onay gerektirmez.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={})),
+        # ── Phase 10 — Ağ/Firewall Kontrolü ──────────────────────────────────────
+        gt.FunctionDeclaration(name="toggle_wifi",
+            description="Ağ arayüzünü açar/kapatır. Kapatma güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "enable": gt.Schema(type=gt.Type.BOOLEAN, description="True: aç, False: kapat"),
+                "interface_name": gt.Schema(type=gt.Type.STRING, description="Arayüz adı (varsayılan 'Wi-Fi')")},
+                required=["enable"])),
+        gt.FunctionDeclaration(name="block_app_network",
+            description="Uygulamanın internet erişimini engeller. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "app_path": gt.Schema(type=gt.Type.STRING, description="Uygulamanın tam .exe yolu")},
+                required=["app_path"])),
+        # ── Phase 10 — Kayıt Defteri (yalnızca HKCU) ─────────────────────────────
+        gt.FunctionDeclaration(name="set_registry_value",
+            description="HKCU altında registry değeri yazar. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "hive": gt.Schema(type=gt.Type.STRING, description="Yalnızca 'HKEY_CURRENT_USER' veya 'HKCU'"),
+                "key_path": gt.Schema(type=gt.Type.STRING, description="Registry anahtar yolu"),
+                "value_name": gt.Schema(type=gt.Type.STRING, description="Değer adı"),
+                "value_data": gt.Schema(type=gt.Type.STRING, description="Yazılacak veri"),
+                "value_type": gt.Schema(type=gt.Type.STRING, description="REG_SZ, REG_DWORD, REG_EXPAND_SZ, REG_MULTI_SZ")},
+                required=["hive", "key_path", "value_name", "value_data"])),
+        gt.FunctionDeclaration(name="delete_registry_key",
+            description="HKCU altında registry anahtarı siler. Güvenlik onayı gerektirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "hive": gt.Schema(type=gt.Type.STRING, description="Yalnızca 'HKEY_CURRENT_USER' veya 'HKCU'"),
+                "key_path": gt.Schema(type=gt.Type.STRING, description="Silinecek anahtar yolu")},
+                required=["hive", "key_path"])),
+        # ── Phase 10 — Konuşma / Agent Geçmişinde Arama ──────────────────────────
+        gt.FunctionDeclaration(name="search_agent_history",
+            description="Geçmiş agent adımlarında tarih ve anahtar kelimeye göre arama yapar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "query": gt.Schema(type=gt.Type.STRING, description="Aranacak anahtar kelime (opsiyonel)"),
+                "days_back": gt.Schema(type=gt.Type.INTEGER, description="Kaç gün geriye bakılacağı")},
+                required=[])),
     ]
     return [gt.Tool(function_declarations=decls)]
 

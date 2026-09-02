@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from send2trash import send2trash
+
 _COMMON: Dict[str, Path] = {
     "desktop":      Path.home() / "Desktop",
     "masaüstü":     Path.home() / "Desktop",
@@ -255,6 +257,56 @@ def filter_files_by_extension(path: str, extension: str) -> List[Dict[str, str]]
         raise PermissionError(f"'{path}' klasörüne erişim reddedildi.")
 
     return results
+
+
+def move_to_recycle_bin(filepath: str) -> str:
+    """
+    Bir dosyayı veya klasörü kalıcı silmek yerine Geri Dönüşüm Kutusu'na taşır.
+    delete_file'a göre daha düşük risklidir; kullanıcı işlemi geri alabilir.
+    """
+    path = _resolve(filepath)
+
+    if not path.exists():
+        raise FileNotFoundError(f"'{filepath}' bulunamadı.")
+
+    try:
+        send2trash(str(path))
+    except OSError as exc:
+        raise RuntimeError(f"'{filepath}' geri dönüşüm kutusuna taşınamadı: {exc}") from exc
+    return f"'{path.name}' geri dönüşüm kutusuna taşındı."
+
+
+def bulk_delete(folder_path: str, pattern: str) -> Dict[str, object]:
+    """
+    Bir klasördeki, verilen glob pattern'ine (örn. '*.tmp') uyan tüm dosyaları
+    Geri Dönüşüm Kutusu'na taşır.
+
+    ⚠️ Güvenlik onayı gerektiren işlem (agent.py tarafından kontrol edilir).
+    """
+    resolved = _resolve(folder_path)
+
+    if not resolved.exists():
+        raise FileNotFoundError(f"'{folder_path}' bulunamadı.")
+    if not resolved.is_dir():
+        raise ValueError(f"'{folder_path}' bir klasör değil.")
+
+    matches = [p for p in resolved.glob(pattern) if p.is_file()]
+    if not matches:
+        return {"silinen_sayı": 0, "dosyalar": []}
+
+    moved: List[str] = []
+    errors: List[str] = []
+    for item in matches:
+        try:
+            send2trash(str(item))
+            moved.append(item.name)
+        except OSError as exc:
+            errors.append(f"{item.name}: {exc}")
+
+    result: Dict[str, object] = {"silinen_sayı": len(moved), "dosyalar": moved}
+    if errors:
+        result["hatalar"] = errors
+    return result
 
 
 # ── Yardımcı ──────────────────────────────────────────────────────────────────
