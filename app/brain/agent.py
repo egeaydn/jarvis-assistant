@@ -29,6 +29,22 @@ CONFIRMATION_REQUIRED: set = {
     "copy_file",
     "run_terminal_command",
     "organize_folder",
+    # Phase 10 — Dosya / Ağ / Sistem / E-posta riskleri
+    "move_to_recycle_bin",
+    "bulk_delete",
+    "send_email",
+    "shutdown_system",
+    "restart_system",
+    "sleep_system",
+    "set_registry_value",
+    "delete_registry_key",
+    "block_app_network",
+}
+
+# Parametreye bağlı olarak onay gerektiren tool'lar: fonksiyon args alır, True ise onay ister.
+# Örn. toggle_wifi(enable=True) risksizdir ama toggle_wifi(enable=False) bağlantıyı keser.
+CONDITIONAL_CONFIRMATION: dict = {
+    "toggle_wifi": lambda args: not args.get("enable", True),
 }
 
 
@@ -106,7 +122,10 @@ class Agent:
 
         def safe_executor(name: str, args: dict) -> Any:
             # Güvenlik kontrolü
-            if name in CONFIRMATION_REQUIRED:
+            needs_confirmation = name in CONFIRMATION_REQUIRED or (
+                name in CONDITIONAL_CONFIRMATION and CONDITIONAL_CONFIRMATION[name](args)
+            )
+            if needs_confirmation:
                 approved = self._confirm(name, _describe_action(name, args), args)
                 if not approved:
                     return {"sonuç": "İşlem kullanıcı tarafından iptal edildi."}
@@ -189,6 +208,37 @@ def _describe_action(tool_name: str, args: dict) -> str:
         path = args.get("folder_path", "?")
         rule = args.get("rule", "tür")
         return f"'{path}' klasörü '{rule}' kuralına göre DÜZENLENECEK ve dosyalar alt klasörlere taşınacak."
+    if tool_name == "move_to_recycle_bin":
+        path = args.get("filepath", "?")
+        return f"'{path}' GERİ DÖNÜŞÜM KUTUSU'na taşınacak."
+    if tool_name == "bulk_delete":
+        folder = args.get("folder_path", "?")
+        pattern = args.get("pattern", "?")
+        return f"'{folder}' klasöründe '{pattern}' desenine uyan TÜM dosyalar geri dönüşüm kutusuna taşınacak."
+    if tool_name == "send_email":
+        to = args.get("to", "?")
+        subject = args.get("subject", "?")
+        body = args.get("body", "?")
+        return f"'{to}' adresine şu e-posta GÖNDERİLECEK:\nKonu: {subject}\nGövde: {body}"
+    if tool_name in ("shutdown_system", "restart_system"):
+        delay = args.get("delay_seconds", 30)
+        action = "KAPATILACAK" if tool_name == "shutdown_system" else "YENİDEN BAŞLATILACAK"
+        return f"Bilgisayar {delay} saniye içinde {action}."
+    if tool_name == "sleep_system":
+        return "Bilgisayar UYKU MODUNA alınacak."
+    if tool_name == "set_registry_value":
+        key_path = args.get("key_path", "?")
+        value_name = args.get("value_name", "?")
+        value_data = args.get("value_data", "?")
+        return f"HKCU\\{key_path}\\{value_name} = {value_data!r} olarak YAZILACAK."
+    if tool_name == "delete_registry_key":
+        key_path = args.get("key_path", "?")
+        return f"HKCU\\{key_path} registry anahtarı SİLİNECEK."
+    if tool_name == "block_app_network":
+        app_path = args.get("app_path", "?")
+        return f"'{app_path}' uygulamasının İNTERNET ERİŞİMİ ENGELLENECEK."
+    if tool_name == "toggle_wifi":
+        return "Wi-Fi arayüzü KAPATILACAK (bağlantı kesilecek)."
     parts = ", ".join(f"{k}={v!r}" for k, v in args.items())
     return f"{tool_name}({parts})"
 

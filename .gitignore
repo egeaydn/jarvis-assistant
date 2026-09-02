@@ -14,5 +14,8 @@ __pycache__/
 # Test cache
 .pytest_cache/
 
+# Çalışma zamanı verileri (notlar, hatırlatıcılar, pano/agent geçmişi)
+data/
+
 # IDE
 .vscode/settings.json

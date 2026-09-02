@@ -10,6 +10,13 @@ ConversationMemory:
 from dataclasses import dataclass, field
 from typing import List, Literal
 
+import json
+from datetime import datetime
+from pathlib import Path
+
+_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+_HISTORY_FILE = _DATA_DIR / "agent_history.jsonl"
+
 
 # ── Veri yapıları ─────────────────────────────────────────────────────────────
 
@@ -25,6 +32,7 @@ class AgentStepRecord:
     action: str
     action_input: dict
     observation: str
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
 
     def to_text(self) -> str:
         args_str = ", ".join(f"{k}={v!r}" for k, v in self.action_input.items())
@@ -64,8 +72,24 @@ class ConversationMemory:
         self._trim()
 
     def add_agent_step(self, step: AgentStepRecord) -> None:
-        """Bir agent adımını step log'una ekler."""
+        """Bir agent adımını step log'una ekler ve kalıcı geçmişe (data/agent_history.jsonl) yazar."""
         self._step_log.append(step)
+        self._persist_step(step)
+
+    def _persist_step(self, step: AgentStepRecord) -> None:
+        """Agent adımını diske append eder; search_agent_history bu dosyayı okur."""
+        try:
+            _DATA_DIR.mkdir(parents=True, exist_ok=True)
+            with _HISTORY_FILE.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "timestamp": step.timestamp,
+                    "thought": step.thought,
+                    "action": step.action,
+                    "action_input": step.action_input,
+                    "observation": step.observation,
+                }, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
 
     # ── Okuma ─────────────────────────────────────────────────────────────────
 

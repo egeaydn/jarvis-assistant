@@ -7,6 +7,7 @@ from app.brain.memory import ConversationMemory
 from app.tools.app_tools import close_application, get_running_apps, open_application
 from app.tools.browser_tools import open_website, search_web
 from app.tools.file_manager_tools import (
+    bulk_delete,
     copy_file,
     create_folder,
     delete_file,
@@ -15,6 +16,7 @@ from app.tools.file_manager_tools import (
     get_file_info,
     list_directory,
     move_file,
+    move_to_recycle_bin,
 )
 from app.tools.file_tools import find_file, open_file
 from app.tools.screen_tools import analyze_screen, capture_screenshot
@@ -25,6 +27,21 @@ from app.services.stt import SpeechToText
 from app.services.tts import TextToSpeech
 from app.ui.window import start_ui
 from app.tools.autonomous_tools import run_terminal_command, organize_folder
+
+# ── Phase 10 — Prodüktivite / Güvenlik araçları ───────────────────────────────
+from app.tools.clipboard_tools import copy_to_clipboard, get_clipboard_history, read_clipboard
+from app.tools.window_tools import close_window, focus_window, list_open_windows, maximize_window, minimize_window
+from app.tools.volume_tools import get_volume, mute_volume, set_volume
+from app.tools.notes_tools import add_note, list_notes, search_notes
+from app.tools.reminder_tools import cancel_reminder, list_reminders, set_reminder
+from app.tools.email_tools import send_email
+from app.tools.briefing_tools import get_daily_briefing
+from app.tools.system_power_tools import cancel_shutdown, restart_system, shutdown_system, sleep_system
+from app.tools.network_tools import block_app_network, toggle_wifi
+from app.tools.registry_tools import delete_registry_key, set_registry_value
+from app.tools.memory_search_tools import search_agent_history
+from app.services.clipboard_listener import start_clipboard_listener
+from app.services.reminder_service import start_reminder_service
 
 
 def build_tool_manager() -> ToolManager:
@@ -58,6 +75,60 @@ def build_tool_manager() -> ToolManager:
     # ── Phase 9 — Autonomous Assistant ────────────────────────────────────────
     tm.register("run_terminal_command",     "Dizinde terminal komutu calistirir",        run_terminal_command,     {"command": "str", "cwd": "str (opsiyonel)"})
     tm.register("organize_folder",          "Klasordeki dosyalari otomatik duzenler",    organize_folder,          {"folder_path": "str", "rule": "str (opsiyonel)"})
+
+    # ── Phase 10 — Pano (Clipboard) Yönetimi ─────────────────────────────────
+    tm.register("copy_to_clipboard",        "Metni sistem panosuna kopyalar",            copy_to_clipboard,        {"text": "str"})
+    tm.register("read_clipboard",           "Panodaki guncel metni okur",                read_clipboard)
+    tm.register("get_clipboard_history",    "Pano gecmisinden son N kaydi dondurur",     get_clipboard_history,    {"limit": "int (opsiyonel)"})
+
+    # ── Phase 10 — Pencere Yönetimi ───────────────────────────────────────────
+    tm.register("maximize_window",          "Uygulama penceresini tam ekran yapar",      maximize_window,          {"app_name": "str"})
+    tm.register("minimize_window",          "Uygulama penceresini kucultur",             minimize_window,          {"app_name": "str"})
+    tm.register("close_window",             "Uygulama penceresini kapatir",              close_window,             {"app_name": "str"})
+    tm.register("focus_window",             "Uygulama penceresine odaklanir",            focus_window,             {"app_name": "str"})
+    tm.register("list_open_windows",        "Acik pencerelerin basliklarini listeler",   list_open_windows)
+
+    # ── Phase 10 — Ses Seviyesi Kontrolü ──────────────────────────────────────
+    tm.register("set_volume",               "Sistem ses seviyesini yuzde olarak ayarlar",set_volume,               {"percent": "int"})
+    tm.register("mute_volume",              "Sistemi sessize alir veya acar",            mute_volume,              {"mute": "bool (opsiyonel)"})
+    tm.register("get_volume",               "Mevcut ses seviyesini ve sessiz durumunu dondurur", get_volume)
+
+    # ── Phase 10 — Hızlı Not Alma ──────────────────────────────────────────────
+    tm.register("add_note",                 "Zaman damgali not ekler",                   add_note,                 {"content": "str", "tag": "str (opsiyonel)"})
+    tm.register("list_notes",               "Kayitli notlari listeler",                  list_notes,               {"tag": "str (opsiyonel)", "limit": "int (opsiyonel)"})
+    tm.register("search_notes",             "Notlar icinde metin aramasi yapar",         search_notes,             {"query": "str"})
+
+    # ── Phase 10 — Hatırlatıcı & Alarm ────────────────────────────────────────
+    tm.register("set_reminder",             "Dogal dil zaman ifadesiyle hatirlatici kurar", set_reminder,          {"message": "str", "when": "str"})
+    tm.register("list_reminders",           "Bekleyen hatirlaticilari listeler",         list_reminders)
+    tm.register("cancel_reminder",          "Bir hatirlaticiyi iptal eder",              cancel_reminder,          {"reminder_id": "str"})
+
+    # ── Phase 10 — Dosya Güvenliği (Recycle Bin) ─────────────────────────────
+    tm.register("move_to_recycle_bin",      "Dosyayi geri donusum kutusuna tasir (guvenlik onayi gerektirir)", move_to_recycle_bin, {"filepath": "str"})
+    tm.register("bulk_delete",              "Desene uyan tum dosyalari geri donusum kutusuna tasir (guvenlik onayi gerektirir)", bulk_delete, {"folder_path": "str", "pattern": "str"})
+
+    # ── Phase 10 — E-posta Gönderme ───────────────────────────────────────────
+    tm.register("send_email",               "SMTP uzerinden e-posta gonderir (guvenlik onayi gerektirir)", send_email, {"to": "str", "subject": "str", "body": "str", "attachments": "list[str] (opsiyonel)"})
+
+    # ── Phase 10 — Sabah Brifingi ──────────────────────────────────────────────
+    tm.register("get_daily_briefing",       "Hava durumu, sistem ve hatirlaticilari ozetler", get_daily_briefing,   {"city": "str (opsiyonel)"})
+
+    # ── Phase 10 — Sistem Güç Yönetimi ────────────────────────────────────────
+    tm.register("shutdown_system",          "Bilgisayari kapatir (guvenlik onayi gerektirir)", shutdown_system,     {"delay_seconds": "int (opsiyonel)"})
+    tm.register("restart_system",           "Bilgisayari yeniden baslatir (guvenlik onayi gerektirir)", restart_system, {"delay_seconds": "int (opsiyonel)"})
+    tm.register("sleep_system",             "Bilgisayari uyku moduna alir (guvenlik onayi gerektirir)", sleep_system)
+    tm.register("cancel_shutdown",          "Zamanlanmis kapatma/yeniden baslatmayi iptal eder", cancel_shutdown)
+
+    # ── Phase 10 — Ağ/Firewall Kontrolü ───────────────────────────────────────
+    tm.register("toggle_wifi",              "Wi-Fi arayuzunu acar/kapatir (kapatma guvenlik onayi gerektirir)", toggle_wifi, {"enable": "bool", "interface_name": "str (opsiyonel)"})
+    tm.register("block_app_network",        "Uygulamanin internet erisimini engeller (guvenlik onayi gerektirir)", block_app_network, {"app_path": "str"})
+
+    # ── Phase 10 — Kayıt Defteri (yalnızca HKCU) ─────────────────────────────
+    tm.register("set_registry_value",       "HKCU altinda registry degeri yazar (guvenlik onayi gerektirir)", set_registry_value, {"hive": "str", "key_path": "str", "value_name": "str", "value_data": "any", "value_type": "str (opsiyonel)"})
+    tm.register("delete_registry_key",      "HKCU altinda registry anahtari siler (guvenlik onayi gerektirir)", delete_registry_key, {"hive": "str", "key_path": "str"})
+
+    # ── Phase 10 — Konuşma / Agent Geçmişinde Arama ──────────────────────────
+    tm.register("search_agent_history",     "Gecmis agent adimlarinda tarih ve anahtar kelimeye gore arar", search_agent_history, {"query": "str (opsiyonel)", "days_back": "int (opsiyonel)"})
 
     return tm
 
@@ -209,6 +280,9 @@ def main() -> None:
 
     tm = build_tool_manager()
 
+    # Phase 10 — Arka plan servislerini baslat (pano gecmisi, hatirlaticilar)
+    start_clipboard_listener()
+    start_reminder_service()
 
     try:
         llm = LLMManager(

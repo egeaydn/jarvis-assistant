@@ -13,6 +13,14 @@ pvrecorder
 # Phase 7 — Screen Vision
 mss
 pillow
+# Phase 10 — Prodüktivite / Güvenlik Araçları
+pyperclip
+pygetwindow
+pycaw
+comtypes
+send2trash
+dateparser
+requests
 # Development / packaging
 pytest
 pyinstaller
