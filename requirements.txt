@@ -8,6 +8,8 @@ SpeechRecognition
 pyaudio
 pyttsx3
 plyer
+spotipy
+PyPDF2
 # Phase v2 — Wake Word (isteğe bağlı Porcupine)
 pvporcupine
 pvrecorder

@@ -107,6 +107,17 @@ def build_tool_manager() -> ToolManager:
     tm.register("move_to_recycle_bin",      "Dosyayi geri donusum kutusuna tasir (guvenlik onayi gerektirir)", move_to_recycle_bin, {"filepath": "str"})
     tm.register("bulk_delete",              "Desene uyan tum dosyalari geri donusum kutusuna tasir (guvenlik onayi gerektirir)", bulk_delete, {"folder_path": "str", "pattern": "str"})
 
+    # ── Phase 10 — Medya ve Spotify Kontrolü ─────────────────────────────────
+    from app.tools.media_tools import play_pause_media, next_track, previous_track, play_music_on_spotify
+    tm.register("play_pause_media",         "Medya oynatmayi baslatir veya duraklatir (Tum uygulamalar)", play_pause_media)
+    tm.register("next_track",               "Medyada sonraki sarkiya gecer", next_track)
+    tm.register("previous_track",           "Medyada onceki sarkiya gecer", previous_track)
+    tm.register("play_music_on_spotify",    "Spotify'da sarki/sanatci arar ve calar", play_music_on_spotify, {"query": "str"})
+
+    # ── Phase 10 — PDF Döküman Okuma / Özetleme ───────────────────────────────
+    from app.tools.document_tools import read_and_summarize_pdf
+    tm.register("read_and_summarize_pdf",   "Diskteki PDF dosyasini okur ve uzunsa ozetler", read_and_summarize_pdf, {"filepath": "str", "custom_prompt": "str (opsiyonel)"})
+
     # ── Phase 10 — E-posta Gönderme ───────────────────────────────────────────
     tm.register("send_email",               "SMTP uzerinden e-posta gonderir (guvenlik onayi gerektirir)", send_email, {"to": "str", "subject": "str", "body": "str", "attachments": "list[str] (opsiyonel)"})
 
