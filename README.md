@@ -134,7 +134,7 @@ GUI modunda konsol penceresi `_hide_console_window()` ile gizlenir (yalnızca ge
 
 1. **Adım loglama** — her araç çağrısı bir `AgentStepRecord` (thought / action / action_input / observation) olarak `ConversationMemory` içine kaydedilir ve `gecmis` komutu ile görüntülenebilir.
 2. **Güvenlik onayı** — `CONFIRMATION_REQUIRED` kümesinde tanımlı araçlar çağrılmadan önce `confirm_fn` üzerinden kullanıcı onayı istenir.
-3. **Konuşma hafızası yönetimi** — kullanıcı/asistan mesajları `ConversationMemory` içinde tutulur ve `LLMManager`'a bağlam olarak aktarılır.
+3. **Konuşma hafızası yönetimi** — kullanıcı/asistan mesajları `ConversationMemory` içinde tutulur. Bu hafıza artık `data/chat_history.json` üzerinden kalıcı (persistent) hale getirilmiştir, asistanı yeniden başlatsanız dahi son konuşmaları hatırlar. Hafıza şişmesini önlemek için maksimum 8-10 mesaj saklayacak şekilde yapılandırılmıştır.
 
 Döngü sonsuz çalışmaya karşı `MAX_STEPS` (8 adım) sınırıyla ve LLM'in döndürdüğü `FINISH` token'ı ile korunur. Bir hata oluşursa `AgentResult.success = False` olarak işaretlenir ve hata mesajı kullanıcıya iletilir.
 
@@ -173,6 +173,17 @@ Tüm araçlar `main.py > build_tool_manager()` içinde `ToolManager.register()` 
 **Otonom Görevler** (`autonomous_tools.py`)
 - `run_terminal_command(command, cwd)` — PowerShell komutu çalıştırır, stdout/stderr/çıkış kodunu döndürür, 30 saniyelik zaman aşımı ile korunur. **Güvenlik onayı gerektirir.**
 - `organize_folder(folder_path, rule)` — dosyaları uzantısına göre `Belgeler`, `Resimler`, `Arşivler`, `Videolar`, `Sesler`, `Kurulumlar` kategorilerine ayırıp alt klasörlere taşır. **Güvenlik onayı gerektirir.**
+
+**Medya ve Eğlence** (`media_tools.py`)
+- `play_pause_media()`, `next_track()`, `previous_track()` — PyAutoGUI kullanarak sistemdeki açık medyaları klavye donanım tuşları simülasyonuyla kontrol eder.
+- `play_music_on_spotify(query)` — Spotipy API entegrasyonu ile (varsa) arka planda belirtilen şarkıyı doğrudan Spotify üzerinden çalmaya başlar.
+
+**Döküman ve Okuma** (`document_tools.py`)
+- `read_and_summarize_pdf(filepath, custom_prompt)` — PyPDF2 ile dosyayı okur. LLM token limitlerini korumak amacıyla, metin çok uzunsa arka planda otomatik olarak özetleyerek döndürür (Gemini destekli akıllı özetleme).
+
+**Günlük Servisler / Hatırlatıcılar**
+- `get_weather(city)` — API anahtarı gerektirmeden `wttr.in` servisi üzerinden güncel hava durumunu getirir.
+- (Ayrıca `plyer` entegrasyonu ile tüm hatırlatıcılar artık hem sesli okunur hem de ekranda **Windows Toast Bildirimi** olarak görüntülenir).
 
 ---
 
@@ -286,9 +297,10 @@ pip install -r requirements.txt
 
 ```
 psutil, PySide6, google-genai, groq, python-dotenv
-SpeechRecognition, pyaudio, pyttsx3
+SpeechRecognition, pyaudio, pyttsx3, plyer, pyautogui
 pvporcupine, pvrecorder   (isteğe bağlı wake-word motoru)
 mss, pillow
+PyPDF2, spotipy           (pdf okuma ve spotify entegrasyonu)
 pytest, pyinstaller       (geliştirme / paketleme)
 ```
 
