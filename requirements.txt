@@ -27,3 +27,4 @@ requests
 # Development / packaging
 pytest
 pyinstaller
+pyautogui

@@ -305,7 +305,7 @@ def main() -> None:
         print(f"[HATA] {exc}")
         sys.exit(1)
 
-    memory = ConversationMemory(max_messages=30)
+    memory = ConversationMemory(max_messages=8)
     agent = Agent(
         llm_manager=llm,
         tool_executor=lambda name, args: tm.execute(name, **args),

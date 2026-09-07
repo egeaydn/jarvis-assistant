@@ -51,7 +51,7 @@ class ConversationMemory:
     Kısa dönemli konuşma hafızası. Kalıcılık özelliğiyle (chat_history.json) desteklenir.
     """
 
-    def __init__(self, max_messages: int = 30) -> None:
+    def __init__(self, max_messages: int = 10) -> None:
         self._max = max_messages
         self._messages: List[Message] = []
         self._step_log: List[AgentStepRecord] = []

@@ -406,6 +406,38 @@ GROQ_TOOLS: List[dict] = [
                 "query": {"type": "string", "description": "Aranacak anahtar kelime (opsiyonel)"},
                 "days_back": {"type": "integer", "description": "Kaç gün geriye bakılacağı (varsayılan 7)"}},
             "required": []}}},
+    {"type": "function", "function": {
+        "name": "play_pause_media",
+        "description": "Medya oynatmayı başlatır veya duraklatır (Tüm uygulamalar).",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {
+        "name": "next_track",
+        "description": "Medyada sonraki şarkıya geçer.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {
+        "name": "previous_track",
+        "description": "Medyada önceki şarkıya geçer.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {
+        "name": "play_music_on_spotify",
+        "description": "Spotify'da şarkı/sanatçı arar ve çalar.",
+        "parameters": {"type": "object",
+            "properties": {"query": {"type": "string", "description": "Aranacak şarkı veya sanatçı"}},
+            "required": ["query"]}}},
+    {"type": "function", "function": {
+        "name": "read_and_summarize_pdf",
+        "description": "Diskteki PDF dosyasını okur ve uzunsa otomatik özetler.",
+        "parameters": {"type": "object",
+            "properties": {
+                "filepath": {"type": "string", "description": "PDF dosyasının yolu"},
+                "custom_prompt": {"type": "string", "description": "Opsiyonel özel özetleme komutu"}},
+            "required": ["filepath"]}}},
+    {"type": "function", "function": {
+        "name": "get_weather",
+        "description": "Belirtilen şehrin anlık hava durumunu API olmadan getirir.",
+        "parameters": {"type": "object",
+            "properties": {"city": {"type": "string", "description": "Hava durumu sorulan şehir"}},
+            "required": ["city"]}}}
 ]
 
 
@@ -686,6 +718,34 @@ def _build_gemini_tools():
                 "query": gt.Schema(type=gt.Type.STRING, description="Aranacak anahtar kelime (opsiyonel)"),
                 "days_back": gt.Schema(type=gt.Type.INTEGER, description="Kaç gün geriye bakılacağı")},
                 required=[])),
+        gt.FunctionDeclaration(name="play_pause_media",
+            description="Medya oynatmayı başlatır veya duraklatır (Tüm uygulamalar).",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={}),
+            required=[]),
+        gt.FunctionDeclaration(name="next_track",
+            description="Medyada sonraki şarkıya geçer.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={}),
+            required=[]),
+        gt.FunctionDeclaration(name="previous_track",
+            description="Medyada önceki şarkıya geçer.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={}),
+            required=[]),
+        gt.FunctionDeclaration(name="play_music_on_spotify",
+            description="Spotify'da şarkı/sanatçı arar ve çalar.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "query": gt.Schema(type=gt.Type.STRING, description="Aranacak şarkı veya sanatçı")},
+                required=["query"])),
+        gt.FunctionDeclaration(name="read_and_summarize_pdf",
+            description="Diskteki PDF dosyasını okur ve uzunsa otomatik özetler.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "filepath": gt.Schema(type=gt.Type.STRING, description="PDF dosyasının yolu"),
+                "custom_prompt": gt.Schema(type=gt.Type.STRING, description="Opsiyonel özel özetleme komutu")},
+                required=["filepath"])),
+        gt.FunctionDeclaration(name="get_weather",
+            description="Belirtilen şehrin anlık hava durumunu API olmadan getirir.",
+            parameters=gt.Schema(type=gt.Type.OBJECT, properties={
+                "city": gt.Schema(type=gt.Type.STRING, description="Hava durumu sorulan şehir")},
+                required=["city"])),
     ]
     return [gt.Tool(function_declarations=decls)]
 
