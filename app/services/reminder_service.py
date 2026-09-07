@@ -98,6 +98,18 @@ class ReminderService:
                     self._save()
 
             for reminder in due:
+                # Windows Toast bildirimi gönder
+                try:
+                    from plyer import notification
+                    notification.notify(
+                        title="Jarvis Hatırlatıcı",
+                        message=reminder["mesaj"],
+                        app_name="Ege Assistant",
+                        timeout=10,
+                    )
+                except Exception as exc:
+                    log.warning("Toast bildirimi gonderilemedi: %s", exc)
+
                 if self._on_due:
                     try:
                         self._on_due(reminder)
