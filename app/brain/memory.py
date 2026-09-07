@@ -16,6 +16,7 @@ from pathlib import Path
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 _HISTORY_FILE = _DATA_DIR / "agent_history.jsonl"
+_CHAT_HISTORY_FILE = _DATA_DIR / "chat_history.json"
 
 
 # ── Veri yapıları ─────────────────────────────────────────────────────────────
@@ -47,32 +48,52 @@ class AgentStepRecord:
 
 class ConversationMemory:
     """
-    Kısa dönemli konuşma hafızası.
-
-    Kullanım:
-        mem = ConversationMemory(max_messages=20)
-        mem.add_user("Chrome aç")
-        mem.add_assistant("Chrome açılıyor...")
-        ctx = mem.get_context()   # → son mesajları özetleyen string
+    Kısa dönemli konuşma hafızası. Kalıcılık özelliğiyle (chat_history.json) desteklenir.
     """
 
-    def __init__(self, max_messages: int = 20) -> None:
+    def __init__(self, max_messages: int = 30) -> None:
         self._max = max_messages
         self._messages: List[Message] = []
         self._step_log: List[AgentStepRecord] = []
+        self._load_chat_history()
+
+    def _load_chat_history(self) -> None:
+        """Geçmiş sohbetleri dosyadan okur."""
+        if not _CHAT_HISTORY_FILE.exists():
+            return
+        try:
+            with _CHAT_HISTORY_FILE.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                for item in data:
+                    self._messages.append(Message(role=item["role"], content=item["content"]))
+            self._trim()
+        except Exception:
+            pass
+
+    def _save_chat_history(self) -> None:
+        """Mevcut sohbetleri diske yazar."""
+        try:
+            _DATA_DIR.mkdir(parents=True, exist_ok=True)
+            data = [{"role": m.role, "content": m.content} for m in self._messages]
+            with _CHAT_HISTORY_FILE.open("w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
 
     # ── Mesaj ekleme ──────────────────────────────────────────────────────────
 
     def add_user(self, content: str) -> None:
         self._messages.append(Message(role="user", content=content))
         self._trim()
+        self._save_chat_history()
 
     def add_assistant(self, content: str) -> None:
         self._messages.append(Message(role="assistant", content=content))
         self._trim()
+        self._save_chat_history()
 
     def add_agent_step(self, step: AgentStepRecord) -> None:
-        """Bir agent adımını step log'una ekler ve kalıcı geçmişe (data/agent_history.jsonl) yazar."""
+        """Bir agent adımını step log'una ekler ve kalıcı geçmişe yazar."""
         self._step_log.append(step)
         self._persist_step(step)
 
@@ -128,6 +149,7 @@ class ConversationMemory:
         """Tüm hafızayı temizler."""
         self._messages.clear()
         self._step_log.clear()
+        self._save_chat_history()
 
     def clear_steps(self) -> None:
         """Sadece agent adımı logunu temizler (yeni görev başında çağrılır)."""
@@ -144,3 +166,4 @@ class ConversationMemory:
         if len(self._messages) > self._max:
             # İlk mesaj system prompt olabilir, onu koru
             self._messages = self._messages[-self._max:]
+

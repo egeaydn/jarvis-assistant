@@ -110,7 +110,9 @@ def build_tool_manager() -> ToolManager:
     # ── Phase 10 — E-posta Gönderme ───────────────────────────────────────────
     tm.register("send_email",               "SMTP uzerinden e-posta gonderir (guvenlik onayi gerektirir)", send_email, {"to": "str", "subject": "str", "body": "str", "attachments": "list[str] (opsiyonel)"})
 
-    # ── Phase 10 — Sabah Brifingi ──────────────────────────────────────────────
+    # ── Phase 10 — Sabah Brifingi & Hava Durumu ────────────────────────────────
+    from app.tools.weather_tools import get_weather
+    tm.register("get_weather",              "Belirtilen sehrin anlik hava durumunu API olmadan getirir", get_weather, {"city": "str"})
     tm.register("get_daily_briefing",       "Hava durumu, sistem ve hatirlaticilari ozetler", get_daily_briefing,   {"city": "str (opsiyonel)"})
 
     # ── Phase 10 — Sistem Güç Yönetimi ────────────────────────────────────────
