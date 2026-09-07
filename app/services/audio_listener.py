@@ -11,6 +11,10 @@ from typing import Callable, Optional
 
 import speech_recognition as sr
 
+from app.config.logger import get_logger
+
+log = get_logger(__name__)
+
 
 class MicrophoneListener:
     """
@@ -56,10 +60,10 @@ class MicrophoneListener:
                 self._recognizer.adjust_for_ambient_noise(source, duration=duration)
             return True
         except OSError as exc:
-            print(f"[AUDIO WN] Mikrofon kalibrasyonu basarisiz: {exc}")
+            log.warning("Mikrofon kalibrasyonu basarisiz: %s", exc)
             return False
         except Exception as exc:
-            print(f"[AUDIO ERR] Kalibrasyon hatasi: {exc}")
+            log.error("Kalibrasyon hatasi: %s", exc)
             return False
 
     def start_background(
@@ -92,15 +96,15 @@ class MicrophoneListener:
                     handler,
                     phrase_time_limit=self._phrase_time_limit,
                 )
-                print("[AUDIO INF] Arka plan dinlemesi baslatildi.")
+                log.info("Arka plan dinlemesi baslatildi.")
                 return True
             except OSError as exc:
                 if attempt >= max_retries - 1:
-                    print(f"[AUDIO WN] Mikrofon erisilemedi: {exc}")
+                    log.warning("Mikrofon erisilemedi: %s", exc)
                     return False
                 time.sleep(0.3)
             except Exception as exc:
-                print(f"[AUDIO ERR] Dinleme baslatilamadi: {exc}")
+                log.error("Dinleme baslatilamadi: %s", exc)
                 return False
 
         return False
@@ -111,10 +115,11 @@ class MicrophoneListener:
             try:
                 self._stop_fn(wait_for_stop=wait)
             except Exception as exc:
-                print(f"[AUDIO WN] Dinleme durdurulurken hata: {exc}")
+                log.warning("Dinleme durdurulurken hata: %s", exc)
             finally:
                 self._stop_fn = None
-                print("[AUDIO INF] Arka plan dinlemesi durduruldu.")
+                log.info("Arka plan dinlemesi durduruldu.")
+
 
     @property
     def is_listening(self) -> bool:

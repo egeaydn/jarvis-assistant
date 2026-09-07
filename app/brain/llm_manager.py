@@ -20,7 +20,12 @@ from typing import Any, Callable, List
 
 from dotenv import load_dotenv
 
+from app.config.logger import get_logger
+
 load_dotenv()
+
+log = get_logger(__name__)
+
 
 
 class Provider(str, Enum):
@@ -773,7 +778,7 @@ class LLMManager:
                     args = json.loads(tc.function.arguments)
                 except json.JSONDecodeError:
                     args = {}
-                print(f"  🔧 {name}({args})")
+                log.debug("Tool cagrisi: %s(%s)", name, args)
                 raw = self._run_tool(name, args)
                 self._messages.append({
                     "role": "tool",
@@ -814,7 +819,7 @@ class LLMManager:
             result_parts = []
             for part in calls:
                 fc = part.function_call
-                print(f"  🔧 {fc.name}({dict(fc.args)})")
+                log.debug("Tool cagrisi: %s(%s)", fc.name, dict(fc.args))
                 raw = self._run_tool(fc.name, dict(fc.args))
                 result_parts.append(
                     gt.Part.from_function_response(

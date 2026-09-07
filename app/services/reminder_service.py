@@ -15,6 +15,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+from app.config.logger import get_logger
+
+log = get_logger(__name__)
+
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 _REMINDERS_FILE = _DATA_DIR / "reminders.json"
 _POLL_INTERVAL = 5.0
@@ -98,9 +102,9 @@ class ReminderService:
                     try:
                         self._on_due(reminder)
                     except Exception as exc:
-                        print(f"[REMINDER ERR] Callback hatasi: {exc}")
+                        log.error("Hatirlatici callback hatasi: %s", exc)
                 else:
-                    print(f"\n🔔 HATIRLATICI: {reminder['mesaj']}\n")
+                    log.info("HATIRLATICI: %s", reminder['mesaj'])
 
             self._stop_event.wait(self._poll_interval)
 

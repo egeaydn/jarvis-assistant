@@ -16,6 +16,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, List, Optional
 
 from app.brain.memory import AgentStepRecord, ConversationMemory
+from app.config.logger import get_logger
+
+log = get_logger(__name__)
+
 
 # ── Sabitler ──────────────────────────────────────────────────────────────────
 
@@ -173,18 +177,13 @@ def _default_confirm(tool_name: str, description: str, args: dict) -> bool:
     """
     Terminal üzerinden kullanıcıdan onay ister (güvenlik sistemi).
     """
-    print(f"\n{'='*52}")
-    print(f"  ⚠️  GÜVENLİK ONAYI GEREKİYOR")
-    print(f"{'='*52}")
-    print(f"  İşlem  : {tool_name}")
-    print(f"  Detay  : {description}")
-    print(f"{'='*52}")
+    log.warning("GUVENLIK ONAYI GEREKIYOR | Islem: %s | Detay: %s", tool_name, description)
     try:
         answer = input("  Onaylıyor musunuz? (e/h): ").strip().lower()
     except (EOFError, KeyboardInterrupt):
         answer = "h"
-    print()
     return answer in ("e", "evet", "y", "yes")
+
 
 
 def _describe_action(tool_name: str, args: dict) -> str:

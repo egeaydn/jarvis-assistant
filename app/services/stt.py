@@ -14,6 +14,10 @@ Kullanım:
 
 import speech_recognition as sr
 
+from app.config.logger import get_logger
+
+log = get_logger(__name__)
+
 
 class SpeechToText:
     """
@@ -46,13 +50,14 @@ class SpeechToText:
         """
         try:
             with sr.Microphone() as source:
-                print("  🔇 Ortam gürültüsü ölçülüyor, lütfen bekleyin...")
+                log.info("Ortam gurultusu olculuyor, lutfen bekleyin...")
                 self._recognizer.adjust_for_ambient_noise(source, duration=duration)
-                print(f"  ✅ Kalibrasyon tamamlandı. (eşik: {self._recognizer.energy_threshold:.0f})")
+                log.info("Kalibrasyon tamamlandi. (esik: %.0f)", self._recognizer.energy_threshold)
         except OSError as exc:
             raise RuntimeError(
                 f"Mikrofon bulunamadı veya erişim reddedildi: {exc}"
             ) from exc
+
 
     def listen_once(self) -> str | None:
         """
