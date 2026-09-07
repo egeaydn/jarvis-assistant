@@ -11,6 +11,10 @@ import sys
 import winreg
 from typing import Tuple
 
+from app.config.logger import get_logger
+
+log = get_logger(__name__)
+
 REG_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_VAL_NAME = "JarvisAssistant"
 APP_USER_MODEL_ID = "EgeAssistant.Jarvis"
@@ -29,8 +33,9 @@ def set_windows_app_user_model_id() -> bool:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
         return True
     except (AttributeError, OSError) as exc:
-        print(f"[WINDOWS WN] AppUserModelID ayarlanamadı: {exc}")
+        log.warning("AppUserModelID ayarlanamadi: %s", exc)
         return False
+
 
 
 def set_autostart(enabled: bool) -> Tuple[bool, str]:

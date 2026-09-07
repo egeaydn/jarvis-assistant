@@ -15,6 +15,10 @@ import threading
 from enum import Enum, auto
 from typing import Callable, Optional
 
+from app.config.logger import get_logger
+
+log = get_logger(__name__)
+
 
 class AssistantState(Enum):
     """Asistanın ses/mikrofon yaşam döngüsü durumları."""
@@ -85,7 +89,7 @@ class AssistantStateManager:
             try:
                 listener(new_state)
             except Exception as exc:
-                print(f"[STATE ERR] Dinleyici hatasi: {exc}")
+                log.error("Durum degisim dinleyici hatasi: %s", exc)
 
     def on_state_changed(
         self,

@@ -41,7 +41,10 @@ from app.config.startup import (
     set_autostart,
     set_windows_app_user_model_id,
 )
+from app.config.logger import get_logger
 from app.ui.styles import QSS
+
+log = get_logger(__name__)
 
 
 def _application_icon() -> QIcon:
@@ -193,7 +196,7 @@ class TTSWorker(QThread):
         try:
             self.tts.speak(self.text)
         except Exception as exc:
-            print(f"[TTS ERR] Seslendirme hatasi: {exc}")
+            log.error("Seslendirme hatasi: %s", exc)
         finally:
             self.finished_speaking.emit()
 
@@ -612,7 +615,7 @@ class MainWindow(QMainWindow):
         try:
             self.wake_word_engine.stop()
         except Exception as exc:
-            print(f"[CLEANUP WN] Wake word durdurulamadi: {exc}")
+            log.warning("Wake word durdurulamadi: %s", exc)
 
         for worker in (self.voice_worker, self.tts_worker, self.agent_worker):
             if worker is not None and worker.isRunning():
