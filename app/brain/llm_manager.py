@@ -1,16 +1,11 @@
 """
-Phase 5 — AI Agent + Çift-sağlayıcı LLM + Tool Calling.
+Phase 5 — AI Agent + Çok-sağlayıcılı LLM + Tool Calling.
 
-Varsayılan: Groq  — OpenAI formatı, ücretsiz kota.
-Yedek     : Gemini — Google genai SDK.
+Varsayılan: NVIDIA NIM — OpenAI uyumlu, DeepSeek-v4 modeli, devasa context window.
+Yedek     : Groq    — OpenAI uyumlu, hızlı yanıt, düşük token limiti.
+Görsel    : Gemini  — Google genai SDK, ekran analizi (Vision) için.
 
-Sağlayıcı seçimi: LLM_PROVIDER=groq | gemini  (.env veya ortam değişkeni)
-
-Phase 5 eklemeleri:
-    - Agent-aware system prompt (çok adımlı görev farkındalığı)
-    - Yeni file manager tool'ları: list_directory, create_folder,
-      get_common_path, move_file, copy_file, delete_file,
-      get_file_info, filter_files_by_extension
+Sağlayıcı seçimi: LLM_PROVIDER=nvidia | groq | gemini  (.env veya ortam değişkeni)
 """
 
 import json
@@ -29,6 +24,7 @@ log = get_logger(__name__)
 
 
 class Provider(str, Enum):
+    NVIDIA = "nvidia"
     GROQ = "groq"
     GEMINI = "gemini"
 
@@ -785,13 +781,81 @@ class LLMManager:
         provider: str = None,
     ) -> None:
         self._executor = tool_executor
-        raw = provider or os.getenv("LLM_PROVIDER", Provider.GROQ)
+        raw = provider or os.getenv("LLM_PROVIDER", Provider.NVIDIA)
         self._provider = Provider(raw.lower())
 
-        if self._provider == Provider.GROQ:
+        if self._provider == Provider.NVIDIA:
+            self._init_nvidia()
+        elif self._provider == Provider.GROQ:
             self._init_groq()
         else:
             self._init_gemini()
+
+    # ── NVIDIA NIM ────────────────────────────────────────────────────────────
+    def _init_nvidia(self) -> None:
+        """NVIDIA NIM endpoint'ini OpenAI uyumlu istemci ile başlatır."""
+        from openai import OpenAI
+        api_key = os.getenv("NVIDIA_API_KEY")
+        if not api_key:
+            raise EnvironmentError("NVIDIA_API_KEY .env dosyasında bulunamadı.")
+        self._nvidia_client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=api_key,
+        )
+        self._nvidia_model = os.getenv("NVIDIA_MODEL", "deepseek-ai/deepseek-v4-pro-0813")
+        self._messages: List[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        log.info("NVIDIA NIM başlatıldı. Model: %s", self._nvidia_model)
+
+    def _chat_nvidia(self, user_input: str) -> str:
+        """NVIDIA NIM ile OpenAI uyumlu function-calling döngüsü."""
+        self._messages.append({"role": "user", "content": user_input})
+
+        for _ in range(self.MAX_TOOL_ROUNDS):
+            resp = self._nvidia_client.chat.completions.create(
+                model=self._nvidia_model,
+                messages=self._messages,
+                tools=GROQ_TOOLS,        # NVIDIA NIM aynı OpenAI formatını kabul eder
+                tool_choice="auto",
+                temperature=0.6,
+                top_p=0.95,
+                max_tokens=4096,
+            )
+            msg = resp.choices[0].message
+
+            if not msg.tool_calls:
+                reply = msg.content or "(Yanıt alınamadı)"
+                self._messages.append({"role": "assistant", "content": reply})
+                return reply
+
+            # Asistan mesajını geçmişe ekle
+            self._messages.append({
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name,
+                                  "arguments": tc.function.arguments}}
+                    for tc in msg.tool_calls
+                ],
+            })
+
+            # Tool'ları çalıştır ve sonuçları geçmişe ekle
+            for tc in msg.tool_calls:
+                name = tc.function.name
+                try:
+                    args = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    args = {}
+                log.debug("Tool cagrisi: %s(%s)", name, args)
+                raw = self._run_tool(name, args)
+                self._messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "name": name,
+                    "content": _format_result(raw),
+                })
+
+        return "(Maksimum tool turuna ulaşıldı)"
 
     # ── Groq ──────────────────────────────────────────────────────────────────
     def _init_groq(self) -> None:
@@ -901,12 +965,14 @@ class LLMManager:
 
     # ── Ortak arayüz ──────────────────────────────────────────────────────────
     def chat(self, user_input: str) -> str:
+        if self._provider == Provider.NVIDIA:
+            return self._chat_nvidia(user_input)
         if self._provider == Provider.GROQ:
             return self._chat_groq(user_input)
         return self._chat_gemini(user_input)
 
     def reset(self) -> None:
-        if self._provider == Provider.GROQ:
+        if self._provider in (Provider.NVIDIA, Provider.GROQ):
             self._messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         else:
             self._init_gemini()

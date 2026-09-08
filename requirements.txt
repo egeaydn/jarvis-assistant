@@ -28,3 +28,4 @@ requests
 pytest
 pyinstaller
 pyautogui
+openai
