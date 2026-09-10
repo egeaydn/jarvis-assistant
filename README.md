@@ -421,3 +421,5 @@ Faz 9  Otonom asistan (terminal + klasör düzenleme)  tamamlandı
 ```
 
 Bu belge, kod tabanının güncel (main branch) durumunu yansıtır; `AGENTS.md` içindeki katkı kurallarına (modüler yapı, tip ipuçları, `try/except` ile hata yönetimi) uygun şekilde güncellenmelidir.
+
+Created By Ege Aydın
